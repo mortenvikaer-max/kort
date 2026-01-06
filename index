@@ -1,0 +1,344 @@
+<!doctype html>
+<html lang="da">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Adresser → Cirkler på kort (København)</title>
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+
+  <style>
+    :root { --border:#e8e8e8; }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 0; }
+    .wrap { display: grid; grid-template-columns: 380px 1fr; height: 100vh; }
+    .panel { padding: 14px; border-right: 1px solid var(--border); overflow: auto; }
+    h2 { font-size: 16px; margin: 0 0 10px; }
+    label { display: block; font-size: 12px; color:#444; margin-top: 10px; }
+    textarea { width: 100%; height: 260px; resize: vertical; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    input[type="text"], input[type="number"], select {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      box-sizing: border-box;
+    }
+    input[type="range"] { width: 100%; }
+    button {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid var(--border);
+      background: #fafafa;
+      border-radius: 12px;
+      cursor: pointer;
+      margin-top: 10px;
+    }
+    button.primary { background: #111; color: #fff; border-color:#111; }
+    button:disabled { opacity: .6; cursor: not-allowed; }
+    .hint { font-size: 12px; color:#666; margin-top: 8px; line-height: 1.35; }
+    #map { height: 100vh; }
+
+    .legend { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border); }
+    .legend h3 { font-size: 13px; margin: 0 0 8px; }
+    .legend-item { display:flex; align-items:center; gap:8px; margin: 6px 0; }
+    .swatch { width: 14px; height: 14px; border-radius: 50%; border: 1px solid #0002; }
+    .legend-item input { transform: translateY(1px); }
+    .status { margin-top: 10px; font-size: 12px; color:#333; white-space: pre-wrap; }
+    .kbd { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; background:#f2f2f2; padding: 1px 6px; border-radius: 8px; }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+    <div class="panel">
+      <h2>Adresser (én pr. linje)</h2>
+
+      <label>Format</label>
+      <div class="hint">
+        <div><span class="kbd">Adresse</span></div>
+        <div>eller <span class="kbd">Adresse | farve | størrelse</span> (størrelse = radius i pixels)</div>
+        <div style="margin-top:6px;">Eksempel: <span class="kbd">Rådhuspladsen 1, 1550 København | #ff0000 | 14</span></div>
+      </div>
+
+      <label for="addresses">Indsæt adresser</label>
+      <textarea id="addresses" placeholder="Rådhuspladsen 1, 1550 København | red | 14
+Nørrebrogade 100, 2200 København N | #0066ff | 18
+Østerbrogade 50, 2100 København Ø"></textarea>
+
+      <div class="row">
+        <div>
+          <label>Standard farve</label>
+          <input id="defaultColor" type="text" value="#ff0000" placeholder="#ff0000 eller red" />
+        </div>
+        <div>
+          <label>Standard størrelse (px)</label>
+          <input id="defaultRadius" type="number" min="2" max="50" value="12" />
+        </div>
+      </div>
+
+      <label>Fyld (opacity)</label>
+      <input id="fillOpacity" type="range" min="0" max="1" step="0.05" value="0.55" />
+      <div class="hint">Tip: Brug lavere opacity hvis cirkler overlapper meget.</div>
+
+      <label style="display:flex; align-items:center; gap:8px; margin-top: 12px;">
+        <input id="limitToCph" type="checkbox" checked />
+        Begræns geokodning til Københavns kommune (0101)
+      </label>
+
+      <button id="plot" class="primary">Plot på kort</button>
+      <button id="clear">Ryd markeringer</button>
+
+      <div id="status" class="status"></div>
+
+      <div class="legend">
+        <h3>Legend / filtre</h3>
+        <div id="legendList" class="hint">Ingen data endnu.</div>
+      </div>
+
+      <div class="hint" style="margin-top:14px;">
+        Geokodning bruger DAWA (Dansk Adresse Web API) til danske adresser. :contentReference[oaicite:3]{index=3}
+      </div>
+    </div>
+
+    <div id="map"></div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <script>
+    // --- Kort ---
+    const map = L.map('map').setView([55.6761, 12.5683], 12); // København
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; OpenStreetMap'
+    }).addTo(map);
+
+    // Layer pr. farve (så vi kan filtrere)
+    const layersByColor = new Map(); // color -> L.LayerGroup
+    function getLayer(color) {
+      if (!layersByColor.has(color)) layersByColor.set(color, L.layerGroup().addTo(map));
+      return layersByColor.get(color);
+    }
+
+    function clearAll() {
+      for (const layer of layersByColor.values()) layer.clearLayers();
+      layersByColor.clear();
+      document.getElementById('legendList').textContent = 'Ingen data endnu.';
+      setStatus('');
+    }
+
+    // --- UI helpers ---
+    const statusEl = document.getElementById('status');
+    function setStatus(msg) { statusEl.textContent = msg || ''; }
+
+    function normColor(s) {
+      if (!s) return '';
+      return s.trim();
+    }
+
+    function parseLine(line) {
+      // Tillad separators: | ; \t
+      const parts = line.split('|').map(x => x.trim());
+      if (parts.length === 1) {
+        // prøve ; eller tab
+        const semi = line.split(';').map(x => x.trim());
+        if (semi.length > 1) return { address: semi[0], color: semi[1], radius: semi[2] };
+        const tab = line.split('\t').map(x => x.trim());
+        if (tab.length > 1) return { address: tab[0], color: tab[1], radius: tab[2] };
+      }
+      return { address: parts[0], color: parts[1], radius: parts[2] };
+    }
+
+    function buildLegend() {
+      const legendEl = document.getElementById('legendList');
+      legendEl.innerHTML = '';
+      if (layersByColor.size === 0) {
+        legendEl.textContent = 'Ingen data endnu.';
+        return;
+      }
+
+      for (const [color, layer] of layersByColor.entries()) {
+        const id = 'chk_' + btoa(color).replace(/=/g,'');
+        const row = document.createElement('div');
+        row.className = 'legend-item';
+
+        const chk = document.createElement('input');
+        chk.type = 'checkbox';
+        chk.id = id;
+        chk.checked = map.hasLayer(layer);
+        chk.addEventListener('change', () => {
+          if (chk.checked) layer.addTo(map);
+          else map.removeLayer(layer);
+        });
+
+        const sw = document.createElement('div');
+        sw.className = 'swatch';
+        sw.style.background = color;
+
+        const label = document.createElement('label');
+        label.htmlFor = id;
+        label.textContent = color;
+
+        row.appendChild(chk);
+        row.appendChild(sw);
+        row.appendChild(label);
+        legendEl.appendChild(row);
+      }
+    }
+
+    // --- DAWA geokodning ---
+    // Vi bruger GeoJSON-format så vi får koordinater direkte.
+    // Primær base: api.dataforsyningen.dk, fallback: dawa.aws.dk (ældre domæne, men ofte stadig aktivt).
+    async function geocodeDAWA(address, limitToCph) {
+      const params = new URLSearchParams();
+      params.set('q', address);
+      params.set('format', 'geojson');
+      params.set('struktur', 'mini');
+      params.set('srid', '4326'); // WGS84
+      if (limitToCph) params.set('kommunekode', '0101');
+
+      const urls = [
+        `https://api.dataforsyningen.dk/adresser?${params.toString()}`,
+        `https://dawa.aws.dk/adresser?${params.toString()}`
+      ];
+
+      let lastErr = null;
+      for (const url of urls) {
+        try {
+          const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const geo = await res.json();
+          const feat = geo && geo.features && geo.features[0];
+          if (!feat) return null;
+          const [lng, lat] = feat.geometry.coordinates;
+          const props = feat.properties || {};
+          return { lat, lng, props };
+        } catch (e) {
+          lastErr = e;
+        }
+      }
+      throw lastErr || new Error('Geokodning fejlede');
+    }
+
+    // Concurrency helper (så vi ikke spammer API'et)
+    async function mapWithConcurrency(items, concurrency, fn) {
+      const results = new Array(items.length);
+      let idx = 0;
+
+      async function worker() {
+        while (idx < items.length) {
+          const my = idx++;
+          results[my] = await fn(items[my], my);
+        }
+      }
+
+      const workers = [];
+      for (let i = 0; i < Math.min(concurrency, items.length); i++) workers.push(worker());
+      await Promise.all(workers);
+      return results;
+    }
+
+    // --- Plot ---
+    document.getElementById('plot').addEventListener('click', async () => {
+      const btn = document.getElementById('plot');
+      btn.disabled = true;
+
+      try {
+        clearAll();
+
+        const defaultColor = normColor(document.getElementById('defaultColor').value) || '#ff0000';
+        const defaultRadius = parseInt(document.getElementById('defaultRadius').value, 10) || 12;
+        const fillOpacity = parseFloat(document.getElementById('fillOpacity').value);
+        const limitToCph = document.getElementById('limitToCph').checked;
+
+        const lines = document.getElementById('addresses').value
+          .split('\n')
+          .map(s => s.trim())
+          .filter(Boolean);
+
+        if (lines.length === 0) {
+          setStatus('Indsæt mindst én adresse.');
+          return;
+        }
+        if (lines.length > 120) {
+          setStatus(`Du har ${lines.length} linjer. Anbefalet max ~100 ad gangen.`);
+        }
+
+        setStatus(`Geokoder ${lines.length} adresser…`);
+
+        const parsed = lines.map(parseLine);
+
+        const results = await mapWithConcurrency(parsed, 4, async (row, i) => {
+          const address = row.address?.trim();
+          if (!address) return { ok:false, address:'(tom)', error:'Tom linje' };
+
+          const color = normColor(row.color) || defaultColor;
+          const radius = Math.max(2, Math.min(50, parseInt(row.radius, 10) || defaultRadius));
+
+          // lille pause pr. request (i praksis “pænere” mod API'er)
+          await new Promise(r => setTimeout(r, 80));
+
+          try {
+            const g = await geocodeDAWA(address, limitToCph);
+            if (!g) return { ok:false, address, error:'Ingen match' };
+            return { ok:true, address, color, radius, lat:g.lat, lng:g.lng };
+          } catch (e) {
+            return { ok:false, address, error: String(e.message || e) };
+          }
+        });
+
+        const bounds = [];
+        let okCount = 0;
+        let failCount = 0;
+
+        for (const r of results) {
+          if (!r?.ok) { failCount++; continue; }
+          okCount++;
+
+          const layer = getLayer(r.color);
+          const marker = L.circleMarker([r.lat, r.lng], {
+            radius: r.radius,
+            color: r.color,
+            fillColor: r.color,
+            fillOpacity,
+            weight: 1
+          }).bindPopup(`<b>${escapeHtml(r.address)}</b><br/>${r.color}, ${r.radius}px`);
+
+          marker.addTo(layer);
+          bounds.push([r.lat, r.lng]);
+        }
+
+        buildLegend();
+
+        if (bounds.length) map.fitBounds(bounds, { padding: [30, 30] });
+
+        // Status + fejlliste
+        let msg = `Færdig ✅\n`;
+        msg += `Matchede: ${okCount}\n`;
+        msg += `Fejl/ingen match: ${failCount}\n`;
+
+        const failed = results.filter(x => !x?.ok).slice(0, 12);
+        if (failed.length) {
+          msg += `\nFørste ${failed.length} fejl:\n`;
+          for (const f of failed) msg += `- ${f.address}: ${f.error}\n`;
+        }
+
+        setStatus(msg);
+      } finally {
+        btn.disabled = false;
+      }
+    });
+
+    document.getElementById('clear').addEventListener('click', () => {
+      clearAll();
+      setStatus('Ryddet.');
+    });
+
+    function escapeHtml(str) {
+      return String(str).replace(/[&<>"']/g, (m) => ({
+        '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'
+      }[m]));
+    }
+  </script>
+</body>
+</html>
