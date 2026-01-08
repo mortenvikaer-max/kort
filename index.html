@@ -21,8 +21,6 @@
       border-radius: 10px;
       box-sizing: border-box;
     }
-    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-    .row3 { display: grid; grid-template-columns: 1.2fr 1fr 0.8fr; gap: 10px; }
     button {
       width: 100%;
       padding: 10px;
@@ -37,22 +35,23 @@
     .hint { font-size: 12px; color:#666; margin-top: 8px; line-height: 1.35; }
     #map { height: 100vh; }
 
-    .list {
-      margin-top: 12px;
-      border-top: 1px solid var(--border);
-      padding-top: 10px;
-    }
+    .row3 { display: grid; grid-template-columns: 1.2fr 1fr 0.8fr; gap: 10px; }
+    .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+    .list { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 10px; }
     .list h3 { font-size: 13px; margin: 0 0 8px; }
     table { width: 100%; border-collapse: collapse; }
     th, td { text-align: left; font-size: 12px; padding: 8px 6px; border-bottom: 1px solid #f0f0f0; vertical-align: top; }
     th { color:#666; font-weight: 600; }
+
     .pill {
       display: inline-flex; align-items: center; gap: 6px;
       padding: 3px 8px; border: 1px solid #0001; border-radius: 999px;
       background: #fff;
+      white-space: nowrap;
     }
     .swatch { width: 10px; height: 10px; border-radius: 50%; border: 1px solid #0002; display:inline-block; }
-    .actions { display:flex; gap:6px; }
+    .actions { display:flex; gap:6px; flex-wrap: wrap; }
     .mini {
       padding: 6px 8px;
       border-radius: 10px;
@@ -60,12 +59,46 @@
       background: #fff;
       cursor: pointer;
       font-size: 12px;
+      width: auto;
+      margin-top: 0;
     }
+    .mini.primary { background:#111; color:#fff; border-color:#111; }
 
     .legend { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border); }
     .legend h3 { font-size: 13px; margin: 0 0 8px; }
     .legend-item { display:flex; align-items:center; gap:8px; margin: 6px 0; font-size: 12px; }
+
     .status { margin-top: 10px; font-size: 12px; color:#333; white-space: pre-wrap; }
+
+    /* slider + preview */
+    .sliderRow {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      gap: 10px;
+    }
+    input[type="range"] { width: 100%; }
+    .previewDot {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      border: 1px solid #0002;
+      background: #111;
+      display: inline-block;
+      flex: none;
+    }
+
+    .bulk {
+      margin-top: 12px;
+      border-top: 1px solid var(--border);
+      padding-top: 10px;
+    }
+    .bulk h3 { font-size: 13px; margin: 0 0 8px; }
+    .bulk .mini { margin-top: 8px; }
+
+    /* small select/inputs inside table edit mode */
+    .inlineInput { width: 100%; padding: 6px; border: 1px solid var(--border); border-radius: 10px; box-sizing: border-box; font-size: 12px; }
+    .inlineSelect { width: 100%; padding: 6px; border: 1px solid var(--border); border-radius: 10px; box-sizing: border-box; font-size: 12px; background: #fff; }
   </style>
 </head>
 
@@ -85,10 +118,16 @@
           <label for="color">Farve</label>
           <select id="color"></select>
         </div>
+
         <div>
-          <label for="radius">Størrelse (px)</label>
-          <input id="radius" type="number" min="2" max="50" value="12"/>
+          <label for="radiusRange">Størrelse (px)</label>
+          <div class="sliderRow">
+            <input id="radiusRange" type="range" min="2" max="50" value="12" />
+            <span id="addPreviewDot" class="previewDot" title="Preview"></span>
+          </div>
+          <div class="hint">Valgt: <span id="radiusValue">12</span> px</div>
         </div>
+
         <div style="display:flex; align-items:end;">
           <button id="add" class="primary" style="margin-top:0;">Tilføj</button>
         </div>
@@ -99,22 +138,42 @@
         Begræns til Københavns kommune (0101)
       </label>
 
-      <button id="plot">Plot alle på kort</button>
-      <button id="clearMarkers">Ryd markeringer (kort)</button>
-      <button id="clearAll">Slet alle i listen</button>
-
       <div id="status" class="status"></div>
+
+      <div class="bulk">
+        <h3>Redigér alle samlet</h3>
+
+        <div class="row2">
+          <div>
+            <label for="bulkRadiusRange">Sæt størrelse for alle (px)</label>
+            <div class="sliderRow">
+              <input id="bulkRadiusRange" type="range" min="2" max="50" value="12" />
+              <span id="bulkPreviewDot" class="previewDot" title="Preview"></span>
+            </div>
+            <div class="hint">Valgt: <span id="bulkRadiusValue">12</span> px</div>
+            <button id="applyBulkRadius" class="mini primary">Anvend størrelse til alle</button>
+          </div>
+
+          <div>
+            <label for="bulkColor">Sæt farve for alle</label>
+            <select id="bulkColor"></select>
+            <button id="applyBulkColor" class="mini">Anvend farve til alle</button>
+            <div class="hint">Tip: Du kan også redigere enkeltvis i listen.</div>
+          </div>
+        </div>
+      </div>
 
       <div class="list">
         <h3>Liste</h3>
-        <div class="hint">Du kan tilføje op til ca. 100 ad gangen.</div>
+        <div class="hint">Punkter geokodes og tegnes med det samme, når du trykker “Tilføj”.</div>
+
         <table>
           <thead>
             <tr>
-              <th style="width: 28%;">Navn</th>
+              <th style="width: 26%;">Navn</th>
               <th>Adresse</th>
-              <th style="width: 18%;">Stil</th>
-              <th style="width: 10%;">&nbsp;</th>
+              <th style="width: 20%;">Stil</th>
+              <th style="width: 22%;">Handling</th>
             </tr>
           </thead>
           <tbody id="tbody">
@@ -137,7 +196,6 @@
   <script>
     // --------- Konfiguration ---------
     const FIXED_FILL_OPACITY = 0.55; // fast (ingen UI-kontrol)
-    const CONCURRENCY = 4;           // antal samtidige geokald
     const PER_REQUEST_DELAY_MS = 80; // lille pause for at være “pæn”
 
     const COLOR_PRESETS = [
@@ -164,14 +222,18 @@
       return layersByColor.get(color);
     }
 
-    function clearMapMarkersOnly() {
-      for (const layer of layersByColor.values()) layer.clearLayers();
-      layersByColor.clear();
-      document.getElementById('legendList').textContent = 'Ingen data endnu.';
+    function removeEmptyLayers() {
+      for (const [color, layer] of [...layersByColor.entries()]) {
+        if (layer.getLayers().length === 0) {
+          if (map.hasLayer(layer)) map.removeLayer(layer);
+          layersByColor.delete(color);
+        }
+      }
     }
 
     // --------- UI / data ---------
-    const entries = []; // {id, name, address, color, radius}
+    // entry: {id, name, address, color, radius, lat?, lng?, marker?, isEditing?}
+    const entries = [];
 
     const statusEl = document.getElementById('status');
     function setStatus(msg) { statusEl.textContent = msg || ''; }
@@ -182,62 +244,26 @@
       }[m]));
     }
 
-    function populateColorSelect() {
-      const sel = document.getElementById('color');
-      sel.innerHTML = '';
+    function uuid() {
+      return (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random());
+    }
+
+    function populateColorSelect(selectEl, defaultValue) {
+      selectEl.innerHTML = '';
       for (const c of COLOR_PRESETS) {
         const opt = document.createElement('option');
         opt.value = c.value;
         opt.textContent = c.label;
-        sel.appendChild(opt);
+        selectEl.appendChild(opt);
       }
-      sel.value = COLOR_PRESETS[0].value;
+      selectEl.value = defaultValue || COLOR_PRESETS[0].value;
     }
 
-    function renderTable() {
-      const tbody = document.getElementById('tbody');
-      tbody.innerHTML = '';
-
-      if (entries.length === 0) {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `<td colspan="4" style="color:#777;">Ingen punkter endnu.</td>`;
-        tbody.appendChild(tr);
-        return;
-      }
-
-      for (const e of entries) {
-        const tr = document.createElement('tr');
-
-        const styleHtml = `
-          <span class="pill">
-            <span class="swatch" style="background:${escapeHtml(e.color)}"></span>
-            ${escapeHtml(e.radius)}px
-          </span>
-        `;
-
-        tr.innerHTML = `
-          <td>${escapeHtml(e.name || '(uden navn)')}</td>
-          <td>${escapeHtml(e.address)}</td>
-          <td>${styleHtml}</td>
-          <td>
-            <div class="actions">
-              <button class="mini" data-del="${e.id}">Slet</button>
-            </div>
-          </td>
-        `;
-
-        tbody.appendChild(tr);
-      }
-
-      // bind delete
-      tbody.querySelectorAll('button[data-del]').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const id = btn.getAttribute('data-del');
-          const idx = entries.findIndex(x => x.id === id);
-          if (idx >= 0) entries.splice(idx, 1);
-          renderTable();
-        });
-      });
+    function setPreviewDot(dotEl, radius, color) {
+      const r = Math.max(2, Math.min(50, Number(radius) || 12));
+      dotEl.style.width = (r * 2) + 'px';
+      dotEl.style.height = (r * 2) + 'px';
+      dotEl.style.background = color || '#111';
     }
 
     // --------- DAWA geokodning ---------
@@ -271,21 +297,74 @@
       throw lastErr || new Error('Geokodning fejlede');
     }
 
-    async function mapWithConcurrency(items, concurrency, fn) {
-      const results = new Array(items.length);
-      let idx = 0;
+    function markerPopupHtml(e) {
+      return `
+        <div style="line-height:1.3">
+          <b>${escapeHtml(e.name || '(uden navn)')}</b><br/>
+          ${escapeHtml(e.address)}<br/>
+          <span style="color:#666">${escapeHtml(e.color)}, ${escapeHtml(e.radius)}px</span>
+        </div>
+      `;
+    }
 
-      async function worker() {
-        while (idx < items.length) {
-          const my = idx++;
-          results[my] = await fn(items[my], my);
-        }
+    function ensureMarkerInCorrectLayer(e, oldColor) {
+      if (!e.marker) return;
+
+      // Hvis farven ikke har ændret sig, er der intet at flytte
+      if (!oldColor || oldColor === e.color) return;
+
+      // Fjern fra gammel layer ved at remove() og addTo() igen
+      e.marker.remove();
+      const newLayer = getLayer(e.color);
+      e.marker.addTo(newLayer);
+
+      removeEmptyLayers();
+    }
+
+    function updateMarkerStyleAndPopup(e) {
+      if (!e.marker) return;
+
+      e.marker.setStyle({
+        color: e.color,
+        fillColor: e.color,
+        fillOpacity: FIXED_FILL_OPACITY,
+        weight: 1
+      });
+      e.marker.setRadius(e.radius);
+      e.marker.bindPopup(markerPopupHtml(e));
+    }
+
+    async function geocodeAndPlaceOrMoveMarker(e, { flyTo = true } = {}) {
+      const limitToCph = document.getElementById('limitToCph').checked;
+
+      await new Promise(r => setTimeout(r, PER_REQUEST_DELAY_MS));
+
+      const g = await geocodeDAWA(e.address, limitToCph);
+      if (!g) return { ok: false, error: 'Ingen match' };
+
+      e.lat = g.lat;
+      e.lng = g.lng;
+
+      if (!e.marker) {
+        const layer = getLayer(e.color);
+        e.marker = L.circleMarker([e.lat, e.lng], {
+          radius: e.radius,
+          color: e.color,
+          fillColor: e.color,
+          fillOpacity: FIXED_FILL_OPACITY,
+          weight: 1
+        }).bindPopup(markerPopupHtml(e)).addTo(layer);
+      } else {
+        e.marker.setLatLng([e.lat, e.lng]);
       }
 
-      const workers = [];
-      for (let i = 0; i < Math.min(concurrency, items.length); i++) workers.push(worker());
-      await Promise.all(workers);
-      return results;
+      updateMarkerStyleAndPopup(e);
+
+      if (flyTo) {
+        map.setView([e.lat, e.lng], Math.max(map.getZoom(), 14));
+      }
+
+      return { ok: true };
     }
 
     // --------- Legend / filtre ---------
@@ -327,130 +406,362 @@
       }
     }
 
-    // --------- Handlers ---------
-    document.getElementById('add').addEventListener('click', () => {
+    // --------- Table rendering (view + edit) ---------
+    function renderTable() {
+      const tbody = document.getElementById('tbody');
+      tbody.innerHTML = '';
+
+      if (entries.length === 0) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td colspan="4" style="color:#777;">Ingen punkter endnu.</td>`;
+        tbody.appendChild(tr);
+        return;
+      }
+
+      for (const e of entries) {
+        const tr = document.createElement('tr');
+
+        if (!e.isEditing) {
+          const styleHtml = `
+            <span class="pill">
+              <span class="swatch" style="background:${escapeHtml(e.color)}"></span>
+              ${escapeHtml(e.radius)}px
+            </span>
+          `;
+
+          tr.innerHTML = `
+            <td>${escapeHtml(e.name || '(uden navn)')}</td>
+            <td>${escapeHtml(e.address)}</td>
+            <td>${styleHtml}</td>
+            <td>
+              <div class="actions">
+                <button class="mini" data-edit="${e.id}">Redigér</button>
+                <button class="mini" data-del="${e.id}">Slet</button>
+              </div>
+            </td>
+          `;
+        } else {
+          // Edit mode: inputs + slider preview
+          const colorSelectId = `editColor_${e.id}`;
+          const radiusId = `editRadius_${e.id}`;
+          const previewId = `editPreview_${e.id}`;
+
+          tr.innerHTML = `
+            <td>
+              <input class="inlineInput" data-name="${e.id}" value="${escapeHtml(e.name || '')}" placeholder="Navn"/>
+            </td>
+            <td>
+              <input class="inlineInput" data-address="${e.id}" value="${escapeHtml(e.address || '')}" placeholder="Adresse"/>
+            </td>
+            <td>
+              <div style="display:grid; gap:6px;">
+                <select class="inlineSelect" id="${colorSelectId}" data-color="${e.id}"></select>
+
+                <div class="sliderRow">
+                  <input id="${radiusId}" type="range" min="2" max="50" value="${escapeHtml(e.radius)}" data-radius="${e.id}"/>
+                  <span id="${previewId}" class="previewDot"></span>
+                </div>
+                <div class="hint">Valgt: <span data-radiusval="${e.id}">${escapeHtml(e.radius)}</span> px</div>
+              </div>
+            </td>
+            <td>
+              <div class="actions">
+                <button class="mini primary" data-save="${e.id}">Gem</button>
+                <button class="mini" data-cancel="${e.id}">Fortryd</button>
+              </div>
+            </td>
+          `;
+        }
+
+        tbody.appendChild(tr);
+
+        // If edit mode, populate select + preview after row is in DOM
+        if (e.isEditing) {
+          const sel = tr.querySelector(`select[data-color="${CSS.escape(e.id)}"]`) || document.getElementById(`editColor_${e.id}`);
+          if (sel) populateColorSelect(sel, e.color);
+
+          const radiusEl = document.getElementById(`editRadius_${e.id}`);
+          const previewEl = document.getElementById(`editPreview_${e.id}`);
+          if (radiusEl && previewEl) {
+            setPreviewDot(previewEl, radiusEl.value, sel ? sel.value : e.color);
+            radiusEl.addEventListener('input', () => {
+              const v = Number(radiusEl.value);
+              const label = tr.querySelector(`[data-radiusval="${CSS.escape(e.id)}"]`);
+              if (label) label.textContent = String(v);
+              setPreviewDot(previewEl, v, sel ? sel.value : e.color);
+            });
+            if (sel) {
+              sel.addEventListener('change', () => setPreviewDot(previewEl, radiusEl.value, sel.value));
+            }
+          }
+        }
+      }
+
+      // bind actions
+      tbody.querySelectorAll('button[data-del]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const id = btn.getAttribute('data-del');
+          const idx = entries.findIndex(x => x.id === id);
+          if (idx < 0) return;
+
+          const e = entries[idx];
+          if (e.marker) e.marker.remove();
+          entries.splice(idx, 1);
+
+          removeEmptyLayers();
+          renderTable();
+          buildLegend();
+        });
+      });
+
+      tbody.querySelectorAll('button[data-edit]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const id = btn.getAttribute('data-edit');
+          const e = entries.find(x => x.id === id);
+          if (!e) return;
+
+          // gem en “snapshot” så Fortryd virker
+          e._backup = { name: e.name, address: e.address, color: e.color, radius: e.radius };
+          e.isEditing = true;
+
+          renderTable();
+        });
+      });
+
+      tbody.querySelectorAll('button[data-cancel]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const id = btn.getAttribute('data-cancel');
+          const e = entries.find(x => x.id === id);
+          if (!e) return;
+
+          if (e._backup) {
+            e.name = e._backup.name;
+            e.address = e._backup.address;
+            e.color = e._backup.color;
+            e.radius = e._backup.radius;
+            delete e._backup;
+          }
+          e.isEditing = false;
+
+          renderTable();
+        });
+      });
+
+      tbody.querySelectorAll('button[data-save]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const id = btn.getAttribute('data-save');
+          const e = entries.find(x => x.id === id);
+          if (!e) return;
+
+          // læs inputs
+          const nameInput = tbody.querySelector(`input[data-name="${CSS.escape(id)}"]`);
+          const addrInput = tbody.querySelector(`input[data-address="${CSS.escape(id)}"]`);
+          const colorSel  = tbody.querySelector(`select[data-color="${CSS.escape(id)}"]`);
+          const radiusEl  = tbody.querySelector(`input[data-radius="${CSS.escape(id)}"]`);
+
+          const newName = (nameInput?.value ?? '').trim();
+          const newAddress = (addrInput?.value ?? '').trim();
+          const newColor = (colorSel?.value ?? e.color);
+          const newRadius = Math.max(2, Math.min(50, Number(radiusEl?.value ?? e.radius)));
+
+          if (!newAddress) { setStatus('Adresse må ikke være tom.'); return; }
+
+          const oldAddress = e.address;
+          const oldColor = e.color;
+
+          e.name = newName;
+          e.address = newAddress;
+          e.color = newColor;
+          e.radius = newRadius;
+
+          setStatus('Gemmer ændringer…');
+
+          try {
+            // Flyt marker til nyt farvelag hvis nødvendigt
+            ensureMarkerInCorrectLayer(e, oldColor);
+
+            // Hvis adressen ændres, re-geocode og flyt markør
+            if (newAddress !== oldAddress) {
+              const r = await geocodeAndPlaceOrMoveMarker(e, { flyTo: true });
+              if (!r.ok) {
+                // hvis geokodning fejler, rul tilbage til backup
+                if (e._backup) {
+                  e.name = e._backup.name;
+                  e.address = e._backup.address;
+                  e.color = e._backup.color;
+                  e.radius = e._backup.radius;
+                  ensureMarkerInCorrectLayer(e, newColor); // flyt evt tilbage
+                  updateMarkerStyleAndPopup(e);
+                }
+                setStatus('Kunne ikke finde adressen (ingen match). Ændringer blev ikke gemt.');
+                e.isEditing = false;
+                delete e._backup;
+                renderTable();
+                buildLegend();
+                return;
+              }
+            } else {
+              // ellers kun stil/popup-opdatering
+              updateMarkerStyleAndPopup(e);
+            }
+
+            e.isEditing = false;
+            delete e._backup;
+
+            renderTable();
+            buildLegend();
+            setStatus('Opdateret ✅');
+          } catch (err) {
+            // rollback ved fejl
+            if (e._backup) {
+              const wasColor = e.color;
+              e.name = e._backup.name;
+              e.address = e._backup.address;
+              e.color = e._backup.color;
+              e.radius = e._backup.radius;
+              delete e._backup;
+              ensureMarkerInCorrectLayer(e, wasColor);
+              updateMarkerStyleAndPopup(e);
+            }
+            e.isEditing = false;
+            renderTable();
+            buildLegend();
+
+            setStatus(
+              'Kunne ikke opdatere (typisk pga. net/CORS ved file://).\n' +
+              `Fejl: ${String(err?.message || err)}`
+            );
+          }
+        });
+      });
+    }
+
+    // --------- Add handler: add + geocode + draw immediately ---------
+    async function addEntry() {
+      const btn = document.getElementById('add');
+      btn.disabled = true;
+
       const name = document.getElementById('name').value.trim();
       const address = document.getElementById('address').value.trim();
       const color = document.getElementById('color').value;
-      const radius = Math.max(2, Math.min(50, parseInt(document.getElementById('radius').value, 10) || 12));
+      const radius = Math.max(2, Math.min(50, Number(document.getElementById('radiusRange').value || 12)));
 
       if (!address) {
         setStatus('Skriv en adresse før du tilføjer.');
+        btn.disabled = false;
         return;
       }
       if (entries.length >= 100) {
-        setStatus('Du har allerede 100 punkter i listen. Slet nogle eller lav en ny omgang.');
+        setStatus('Du har allerede 100 punkter i listen. Slet nogle før du tilføjer flere.');
+        btn.disabled = false;
         return;
       }
 
-      entries.push({
-        id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random(),
-        name,
-        address,
-        color,
-        radius
-      });
-
-      // ryd felter (navn beholdes ofte? jeg rydder begge – nemt at ændre)
-      document.getElementById('name').value = '';
-      document.getElementById('address').value = '';
-      document.getElementById('address').focus();
-
-      setStatus('');
+      const e = { id: uuid(), name, address, color, radius, marker: null, isEditing: false };
+      entries.push(e);
       renderTable();
-    });
-
-    document.getElementById('plot').addEventListener('click', async () => {
-      const btn = document.getElementById('plot');
-      btn.disabled = true;
+      setStatus('Geokoder og tilføjer på kort…');
 
       try {
-        clearMapMarkersOnly();
-
-        if (entries.length === 0) {
-          setStatus('Tilføj mindst ét punkt i listen først.');
+        const r = await geocodeAndPlaceOrMoveMarker(e, { flyTo: true });
+        if (!r.ok) {
+          // fjern entry igen hvis ingen match (så listen ikke fyldes med “døde” rækker)
+          const idx = entries.findIndex(x => x.id === e.id);
+          if (idx >= 0) entries.splice(idx, 1);
+          renderTable();
+          setStatus('Ingen match på adressen. Prøv at tilføje postnr/by eller slå kommune-begrænsning fra.');
+          btn.disabled = false;
           return;
         }
 
-        const limitToCph = document.getElementById('limitToCph').checked;
-
-        setStatus(`Geokoder ${entries.length} adresser…`);
-
-        const results = await mapWithConcurrency(entries, CONCURRENCY, async (e) => {
-          await new Promise(r => setTimeout(r, PER_REQUEST_DELAY_MS));
-          try {
-            const g = await geocodeDAWA(e.address, limitToCph);
-            if (!g) return { ok:false, entry:e, error:'Ingen match' };
-            return { ok:true, entry:e, lat:g.lat, lng:g.lng };
-          } catch (err) {
-            return { ok:false, entry:e, error: String(err?.message || err) };
-          }
-        });
-
-        let okCount = 0, failCount = 0;
-        const bounds = [];
-
-        for (const r of results) {
-          if (!r.ok) { failCount++; continue; }
-          okCount++;
-
-          const e = r.entry;
-          const layer = getLayer(e.color);
-
-          const popup = `
-            <div style="line-height:1.3">
-              <b>${escapeHtml(e.name || '(uden navn)')}</b><br/>
-              ${escapeHtml(e.address)}<br/>
-              <span style="color:#666">${escapeHtml(e.color)}, ${escapeHtml(e.radius)}px</span>
-            </div>
-          `;
-
-          L.circleMarker([r.lat, r.lng], {
-            radius: e.radius,
-            color: e.color,
-            fillColor: e.color,
-            fillOpacity: FIXED_FILL_OPACITY,
-            weight: 1
-          }).bindPopup(popup).addTo(layer);
-
-          bounds.push([r.lat, r.lng]);
-        }
-
         buildLegend();
+        setStatus('Tilføjet ✅');
 
-        if (bounds.length) map.fitBounds(bounds, { padding: [30, 30] });
+        document.getElementById('name').value = '';
+        document.getElementById('address').value = '';
+        document.getElementById('address').focus();
+      } catch (err) {
+        // fjern entry igen ved fejl
+        const idx = entries.findIndex(x => x.id === e.id);
+        if (idx >= 0) entries.splice(idx, 1);
+        renderTable();
 
-        let msg = `Færdig ✅\nMatchede: ${okCount}\nFejl/ingen match: ${failCount}\n`;
-        const failed = results.filter(x => !x.ok).slice(0, 12);
-        if (failed.length) {
-          msg += `\nFørste ${failed.length} fejl:\n`;
-          for (const f of failed) {
-            const n = f.entry?.name ? `${f.entry.name} — ` : '';
-            msg += `- ${n}${f.entry.address}: ${f.error}\n`;
-          }
-        }
-        setStatus(msg);
-
+        setStatus(
+          'Kunne ikke hente koordinater.\n' +
+          'Hvis du åbner som file://, så prøv via http://localhost (lokal server).\n\n' +
+          `Fejl: ${String(err?.message || err)}`
+        );
       } finally {
         btn.disabled = false;
       }
-    });
+    }
 
-    document.getElementById('clearMarkers').addEventListener('click', () => {
-      clearMapMarkersOnly();
-      setStatus('Ryddede markeringer på kortet.');
-    });
+    // --------- Bulk edit handlers ---------
+    function applyBulkRadius() {
+      const r = Math.max(2, Math.min(50, Number(document.getElementById('bulkRadiusRange').value || 12)));
+      if (entries.length === 0) { setStatus('Der er ingen punkter at opdatere.'); return; }
 
-    document.getElementById('clearAll').addEventListener('click', () => {
-      entries.splice(0, entries.length);
-      clearMapMarkersOnly();
+      for (const e of entries) {
+        e.radius = r;
+        updateMarkerStyleAndPopup(e);
+      }
       renderTable();
-      setStatus('Slettede alle punkter i listen.');
-    });
+      setStatus(`Opdaterede størrelse til ${r}px for alle ✅`);
+    }
 
-    // Init
-    populateColorSelect();
-    renderTable();
+    function applyBulkColor() {
+      const c = document.getElementById('bulkColor').value;
+      if (entries.length === 0) { setStatus('Der er ingen punkter at opdatere.'); return; }
+
+      for (const e of entries) {
+        const oldColor = e.color;
+        e.color = c;
+        ensureMarkerInCorrectLayer(e, oldColor);
+        updateMarkerStyleAndPopup(e);
+      }
+      removeEmptyLayers();
+      buildLegend();
+      renderTable();
+      setStatus('Opdaterede farve for alle ✅');
+    }
+
+    // --------- Init ---------
+    // populate selects
+    populateColorSelect(document.getElementById('color'), COLOR_PRESETS[0].value);
+    populateColorSelect(document.getElementById('bulkColor'), COLOR_PRESETS[0].value);
+
+    // add slider preview (add form)
+    const radiusRange = document.getElementById('radiusRange');
+    const radiusValue = document.getElementById('radiusValue');
+    const addPreviewDot = document.getElementById('addPreviewDot');
+    const colorSelect = document.getElementById('color');
+
+    function syncAddPreview() {
+      radiusValue.textContent = String(radiusRange.value);
+      setPreviewDot(addPreviewDot, radiusRange.value, colorSelect.value);
+    }
+    radiusRange.addEventListener('input', syncAddPreview);
+    colorSelect.addEventListener('change', syncAddPreview);
+    syncAddPreview();
+
+    // bulk slider preview
+    const bulkRange = document.getElementById('bulkRadiusRange');
+    const bulkValue = document.getElementById('bulkRadiusValue');
+    const bulkPreviewDot = document.getElementById('bulkPreviewDot');
+    const bulkColorSelect = document.getElementById('bulkColor');
+
+    function syncBulkPreview() {
+      bulkValue.textContent = String(bulkRange.value);
+      setPreviewDot(bulkPreviewDot, bulkRange.value, bulkColorSelect.value);
+    }
+    bulkRange.addEventListener('input', syncBulkPreview);
+    bulkColorSelect.addEventListener('change', syncBulkPreview);
+    syncBulkPreview();
+
+    // bind buttons
+    document.getElementById('add').addEventListener('click', addEntry);
+    document.getElementById('applyBulkRadius').addEventListener('click', applyBulkRadius);
+    document.getElementById('applyBulkColor').addEventListener('click', applyBulkColor);
 
     // Enter i adressefelt = tilføj
     document.getElementById('address').addEventListener('keydown', (e) => {
@@ -459,6 +770,8 @@
         document.getElementById('add').click();
       }
     });
+
+    renderTable();
   </script>
 </body>
 </html>
