@@ -3,19 +3,17 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Adresser → Cirkler på kort (København)</title>
+  <title>Navn + adresse → Cirkler på kort (København)</title>
 
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 
   <style>
     :root { --border:#e8e8e8; }
     body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 0; }
-    .wrap { display: grid; grid-template-columns: 380px 1fr; height: 100vh; }
+    .wrap { display: grid; grid-template-columns: 420px 1fr; height: 100vh; }
     .panel { padding: 14px; border-right: 1px solid var(--border); overflow: auto; }
-    h2 { font-size: 16px; margin: 0 0 10px; }
+    h2 { font-size: 16px; margin: 0 0 12px; }
     label { display: block; font-size: 12px; color:#444; margin-top: 10px; }
-    textarea { width: 100%; height: 260px; resize: vertical; }
-    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     input[type="text"], input[type="number"], select {
       width: 100%;
       padding: 8px;
@@ -23,7 +21,8 @@
       border-radius: 10px;
       box-sizing: border-box;
     }
-    input[type="range"] { width: 100%; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .row3 { display: grid; grid-template-columns: 1.2fr 1fr 0.8fr; gap: 10px; }
     button {
       width: 100%;
       padding: 10px;
@@ -38,65 +37,95 @@
     .hint { font-size: 12px; color:#666; margin-top: 8px; line-height: 1.35; }
     #map { height: 100vh; }
 
+    .list {
+      margin-top: 12px;
+      border-top: 1px solid var(--border);
+      padding-top: 10px;
+    }
+    .list h3 { font-size: 13px; margin: 0 0 8px; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { text-align: left; font-size: 12px; padding: 8px 6px; border-bottom: 1px solid #f0f0f0; vertical-align: top; }
+    th { color:#666; font-weight: 600; }
+    .pill {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 3px 8px; border: 1px solid #0001; border-radius: 999px;
+      background: #fff;
+    }
+    .swatch { width: 10px; height: 10px; border-radius: 50%; border: 1px solid #0002; display:inline-block; }
+    .actions { display:flex; gap:6px; }
+    .mini {
+      padding: 6px 8px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: #fff;
+      cursor: pointer;
+      font-size: 12px;
+    }
+
     .legend { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border); }
     .legend h3 { font-size: 13px; margin: 0 0 8px; }
-    .legend-item { display:flex; align-items:center; gap:8px; margin: 6px 0; }
-    .swatch { width: 14px; height: 14px; border-radius: 50%; border: 1px solid #0002; }
-    .legend-item input { transform: translateY(1px); }
+    .legend-item { display:flex; align-items:center; gap:8px; margin: 6px 0; font-size: 12px; }
     .status { margin-top: 10px; font-size: 12px; color:#333; white-space: pre-wrap; }
-    .kbd { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; background:#f2f2f2; padding: 1px 6px; border-radius: 8px; }
   </style>
 </head>
 
 <body>
   <div class="wrap">
     <div class="panel">
-      <h2>Adresser (én pr. linje)</h2>
+      <h2>Tilføj punkter</h2>
 
-      <label>Format</label>
-      <div class="hint">
-        <div><span class="kbd">Adresse</span></div>
-        <div>eller <span class="kbd">Adresse | farve | størrelse</span> (størrelse = radius i pixels)</div>
-        <div style="margin-top:6px;">Eksempel: <span class="kbd">Rådhuspladsen 1, 1550 København | #ff0000 | 14</span></div>
-      </div>
+      <label for="name">Navn</label>
+      <input id="name" type="text" placeholder="Fx 'Kunde A' eller 'Lokation 1'"/>
 
-      <label for="addresses">Indsæt adresser</label>
-      <textarea id="addresses" placeholder="Rådhuspladsen 1, 1550 København | red | 14
-Nørrebrogade 100, 2200 København N | #0066ff | 18
-Østerbrogade 50, 2100 København Ø"></textarea>
+      <label for="address">Adresse</label>
+      <input id="address" type="text" placeholder="Fx 'Rådhuspladsen 1, 1550 København'"/>
 
-      <div class="row">
+      <div class="row3">
         <div>
-          <label>Standard farve</label>
-          <input id="defaultColor" type="text" value="#ff0000" placeholder="#ff0000 eller red" />
+          <label for="color">Farve</label>
+          <select id="color"></select>
         </div>
         <div>
-          <label>Standard størrelse (px)</label>
-          <input id="defaultRadius" type="number" min="2" max="50" value="12" />
+          <label for="radius">Størrelse (px)</label>
+          <input id="radius" type="number" min="2" max="50" value="12"/>
+        </div>
+        <div style="display:flex; align-items:end;">
+          <button id="add" class="primary" style="margin-top:0;">Tilføj</button>
         </div>
       </div>
-
-      <label>Fyld (opacity)</label>
-      <input id="fillOpacity" type="range" min="0" max="1" step="0.05" value="0.55" />
-      <div class="hint">Tip: Brug lavere opacity hvis cirkler overlapper meget.</div>
 
       <label style="display:flex; align-items:center; gap:8px; margin-top: 12px;">
         <input id="limitToCph" type="checkbox" checked />
-        Begræns geokodning til Københavns kommune (0101)
+        Begræns til Københavns kommune (0101)
       </label>
 
-      <button id="plot" class="primary">Plot på kort</button>
-      <button id="clear">Ryd markeringer</button>
+      <button id="plot">Plot alle på kort</button>
+      <button id="clearMarkers">Ryd markeringer (kort)</button>
+      <button id="clearAll">Slet alle i listen</button>
 
       <div id="status" class="status"></div>
 
-      <div class="legend">
-        <h3>Legend / filtre</h3>
-        <div id="legendList" class="hint">Ingen data endnu.</div>
+      <div class="list">
+        <h3>Liste</h3>
+        <div class="hint">Du kan tilføje op til ca. 100 ad gangen.</div>
+        <table>
+          <thead>
+            <tr>
+              <th style="width: 28%;">Navn</th>
+              <th>Adresse</th>
+              <th style="width: 18%;">Stil</th>
+              <th style="width: 10%;">&nbsp;</th>
+            </tr>
+          </thead>
+          <tbody id="tbody">
+            <tr><td colspan="4" style="color:#777;">Ingen punkter endnu.</td></tr>
+          </tbody>
+        </table>
       </div>
 
-      <div class="hint" style="margin-top:14px;">
-        Geokodning bruger DAWA (Dansk Adresse Web API) til danske adresser. :contentReference[oaicite:3]{index=3}
+      <div class="legend">
+        <h3>Legend / filtre (kort)</h3>
+        <div id="legendList" class="hint">Ingen data endnu.</div>
       </div>
     </div>
 
@@ -106,52 +135,164 @@ Nørrebrogade 100, 2200 København N | #0066ff | 18
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
   <script>
-    // --- Kort ---
+    // --------- Konfiguration ---------
+    const FIXED_FILL_OPACITY = 0.55; // fast (ingen UI-kontrol)
+    const CONCURRENCY = 4;           // antal samtidige geokald
+    const PER_REQUEST_DELAY_MS = 80; // lille pause for at være “pæn”
+
+    const COLOR_PRESETS = [
+      { label: "Rød",   value: "#e11d48" },
+      { label: "Blå",   value: "#2563eb" },
+      { label: "Grøn",  value: "#16a34a" },
+      { label: "Orange",value: "#f97316" },
+      { label: "Lilla", value: "#7c3aed" },
+      { label: "Sort",  value: "#111827" },
+      { label: "Grå",   value: "#6b7280" },
+    ];
+
+    // --------- Kort ---------
     const map = L.map('map').setView([55.6761, 12.5683], 12); // København
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
       attribution: '&copy; OpenStreetMap'
     }).addTo(map);
 
-    // Layer pr. farve (så vi kan filtrere)
+    // Layer pr. farve (nem legend/filter)
     const layersByColor = new Map(); // color -> L.LayerGroup
     function getLayer(color) {
       if (!layersByColor.has(color)) layersByColor.set(color, L.layerGroup().addTo(map));
       return layersByColor.get(color);
     }
 
-    function clearAll() {
+    function clearMapMarkersOnly() {
       for (const layer of layersByColor.values()) layer.clearLayers();
       layersByColor.clear();
       document.getElementById('legendList').textContent = 'Ingen data endnu.';
-      setStatus('');
     }
 
-    // --- UI helpers ---
+    // --------- UI / data ---------
+    const entries = []; // {id, name, address, color, radius}
+
     const statusEl = document.getElementById('status');
     function setStatus(msg) { statusEl.textContent = msg || ''; }
 
-    function normColor(s) {
-      if (!s) return '';
-      return s.trim();
+    function escapeHtml(str) {
+      return String(str ?? '').replace(/[&<>"']/g, (m) => ({
+        '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'
+      }[m]));
     }
 
-    function parseLine(line) {
-      // Tillad separators: | ; \t
-      const parts = line.split('|').map(x => x.trim());
-      if (parts.length === 1) {
-        // prøve ; eller tab
-        const semi = line.split(';').map(x => x.trim());
-        if (semi.length > 1) return { address: semi[0], color: semi[1], radius: semi[2] };
-        const tab = line.split('\t').map(x => x.trim());
-        if (tab.length > 1) return { address: tab[0], color: tab[1], radius: tab[2] };
+    function populateColorSelect() {
+      const sel = document.getElementById('color');
+      sel.innerHTML = '';
+      for (const c of COLOR_PRESETS) {
+        const opt = document.createElement('option');
+        opt.value = c.value;
+        opt.textContent = c.label;
+        sel.appendChild(opt);
       }
-      return { address: parts[0], color: parts[1], radius: parts[2] };
+      sel.value = COLOR_PRESETS[0].value;
     }
 
+    function renderTable() {
+      const tbody = document.getElementById('tbody');
+      tbody.innerHTML = '';
+
+      if (entries.length === 0) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td colspan="4" style="color:#777;">Ingen punkter endnu.</td>`;
+        tbody.appendChild(tr);
+        return;
+      }
+
+      for (const e of entries) {
+        const tr = document.createElement('tr');
+
+        const styleHtml = `
+          <span class="pill">
+            <span class="swatch" style="background:${escapeHtml(e.color)}"></span>
+            ${escapeHtml(e.radius)}px
+          </span>
+        `;
+
+        tr.innerHTML = `
+          <td>${escapeHtml(e.name || '(uden navn)')}</td>
+          <td>${escapeHtml(e.address)}</td>
+          <td>${styleHtml}</td>
+          <td>
+            <div class="actions">
+              <button class="mini" data-del="${e.id}">Slet</button>
+            </div>
+          </td>
+        `;
+
+        tbody.appendChild(tr);
+      }
+
+      // bind delete
+      tbody.querySelectorAll('button[data-del]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const id = btn.getAttribute('data-del');
+          const idx = entries.findIndex(x => x.id === id);
+          if (idx >= 0) entries.splice(idx, 1);
+          renderTable();
+        });
+      });
+    }
+
+    // --------- DAWA geokodning ---------
+    async function geocodeDAWA(address, limitToCph) {
+      const params = new URLSearchParams();
+      params.set('q', address);
+      params.set('format', 'geojson');
+      params.set('struktur', 'mini');
+      params.set('srid', '4326');
+      if (limitToCph) params.set('kommunekode', '0101');
+
+      const urls = [
+        `https://api.dataforsyningen.dk/adresser?${params.toString()}`,
+        `https://dawa.aws.dk/adresser?${params.toString()}`
+      ];
+
+      let lastErr = null;
+      for (const url of urls) {
+        try {
+          const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const geo = await res.json();
+          const feat = geo && geo.features && geo.features[0];
+          if (!feat) return null;
+          const [lng, lat] = feat.geometry.coordinates;
+          return { lat, lng };
+        } catch (e) {
+          lastErr = e;
+        }
+      }
+      throw lastErr || new Error('Geokodning fejlede');
+    }
+
+    async function mapWithConcurrency(items, concurrency, fn) {
+      const results = new Array(items.length);
+      let idx = 0;
+
+      async function worker() {
+        while (idx < items.length) {
+          const my = idx++;
+          results[my] = await fn(items[my], my);
+        }
+      }
+
+      const workers = [];
+      for (let i = 0; i < Math.min(concurrency, items.length); i++) workers.push(worker());
+      await Promise.all(workers);
+      return results;
+    }
+
+    // --------- Legend / filtre ---------
     function buildLegend() {
       const legendEl = document.getElementById('legendList');
       legendEl.innerHTML = '';
+
       if (layersByColor.size === 0) {
         legendEl.textContent = 'Ingen data endnu.';
         return;
@@ -171,7 +312,7 @@ Nørrebrogade 100, 2200 København N | #0066ff | 18
           else map.removeLayer(layer);
         });
 
-        const sw = document.createElement('div');
+        const sw = document.createElement('span');
         sw.className = 'swatch';
         sw.style.background = color;
 
@@ -186,125 +327,92 @@ Nørrebrogade 100, 2200 København N | #0066ff | 18
       }
     }
 
-    // --- DAWA geokodning ---
-    // Vi bruger GeoJSON-format så vi får koordinater direkte.
-    // Primær base: api.dataforsyningen.dk, fallback: dawa.aws.dk (ældre domæne, men ofte stadig aktivt).
-    async function geocodeDAWA(address, limitToCph) {
-      const params = new URLSearchParams();
-      params.set('q', address);
-      params.set('format', 'geojson');
-      params.set('struktur', 'mini');
-      params.set('srid', '4326'); // WGS84
-      if (limitToCph) params.set('kommunekode', '0101');
+    // --------- Handlers ---------
+    document.getElementById('add').addEventListener('click', () => {
+      const name = document.getElementById('name').value.trim();
+      const address = document.getElementById('address').value.trim();
+      const color = document.getElementById('color').value;
+      const radius = Math.max(2, Math.min(50, parseInt(document.getElementById('radius').value, 10) || 12));
 
-      const urls = [
-        `https://api.dataforsyningen.dk/adresser?${params.toString()}`,
-        `https://dawa.aws.dk/adresser?${params.toString()}`
-      ];
-
-      let lastErr = null;
-      for (const url of urls) {
-        try {
-          const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          const geo = await res.json();
-          const feat = geo && geo.features && geo.features[0];
-          if (!feat) return null;
-          const [lng, lat] = feat.geometry.coordinates;
-          const props = feat.properties || {};
-          return { lat, lng, props };
-        } catch (e) {
-          lastErr = e;
-        }
+      if (!address) {
+        setStatus('Skriv en adresse før du tilføjer.');
+        return;
       }
-      throw lastErr || new Error('Geokodning fejlede');
-    }
-
-    // Concurrency helper (så vi ikke spammer API'et)
-    async function mapWithConcurrency(items, concurrency, fn) {
-      const results = new Array(items.length);
-      let idx = 0;
-
-      async function worker() {
-        while (idx < items.length) {
-          const my = idx++;
-          results[my] = await fn(items[my], my);
-        }
+      if (entries.length >= 100) {
+        setStatus('Du har allerede 100 punkter i listen. Slet nogle eller lav en ny omgang.');
+        return;
       }
 
-      const workers = [];
-      for (let i = 0; i < Math.min(concurrency, items.length); i++) workers.push(worker());
-      await Promise.all(workers);
-      return results;
-    }
+      entries.push({
+        id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random(),
+        name,
+        address,
+        color,
+        radius
+      });
 
-    // --- Plot ---
+      // ryd felter (navn beholdes ofte? jeg rydder begge – nemt at ændre)
+      document.getElementById('name').value = '';
+      document.getElementById('address').value = '';
+      document.getElementById('address').focus();
+
+      setStatus('');
+      renderTable();
+    });
+
     document.getElementById('plot').addEventListener('click', async () => {
       const btn = document.getElementById('plot');
       btn.disabled = true;
 
       try {
-        clearAll();
+        clearMapMarkersOnly();
 
-        const defaultColor = normColor(document.getElementById('defaultColor').value) || '#ff0000';
-        const defaultRadius = parseInt(document.getElementById('defaultRadius').value, 10) || 12;
-        const fillOpacity = parseFloat(document.getElementById('fillOpacity').value);
-        const limitToCph = document.getElementById('limitToCph').checked;
-
-        const lines = document.getElementById('addresses').value
-          .split('\n')
-          .map(s => s.trim())
-          .filter(Boolean);
-
-        if (lines.length === 0) {
-          setStatus('Indsæt mindst én adresse.');
+        if (entries.length === 0) {
+          setStatus('Tilføj mindst ét punkt i listen først.');
           return;
         }
-        if (lines.length > 120) {
-          setStatus(`Du har ${lines.length} linjer. Anbefalet max ~100 ad gangen.`);
-        }
 
-        setStatus(`Geokoder ${lines.length} adresser…`);
+        const limitToCph = document.getElementById('limitToCph').checked;
 
-        const parsed = lines.map(parseLine);
+        setStatus(`Geokoder ${entries.length} adresser…`);
 
-        const results = await mapWithConcurrency(parsed, 4, async (row, i) => {
-          const address = row.address?.trim();
-          if (!address) return { ok:false, address:'(tom)', error:'Tom linje' };
-
-          const color = normColor(row.color) || defaultColor;
-          const radius = Math.max(2, Math.min(50, parseInt(row.radius, 10) || defaultRadius));
-
-          // lille pause pr. request (i praksis “pænere” mod API'er)
-          await new Promise(r => setTimeout(r, 80));
-
+        const results = await mapWithConcurrency(entries, CONCURRENCY, async (e) => {
+          await new Promise(r => setTimeout(r, PER_REQUEST_DELAY_MS));
           try {
-            const g = await geocodeDAWA(address, limitToCph);
-            if (!g) return { ok:false, address, error:'Ingen match' };
-            return { ok:true, address, color, radius, lat:g.lat, lng:g.lng };
-          } catch (e) {
-            return { ok:false, address, error: String(e.message || e) };
+            const g = await geocodeDAWA(e.address, limitToCph);
+            if (!g) return { ok:false, entry:e, error:'Ingen match' };
+            return { ok:true, entry:e, lat:g.lat, lng:g.lng };
+          } catch (err) {
+            return { ok:false, entry:e, error: String(err?.message || err) };
           }
         });
 
+        let okCount = 0, failCount = 0;
         const bounds = [];
-        let okCount = 0;
-        let failCount = 0;
 
         for (const r of results) {
-          if (!r?.ok) { failCount++; continue; }
+          if (!r.ok) { failCount++; continue; }
           okCount++;
 
-          const layer = getLayer(r.color);
-          const marker = L.circleMarker([r.lat, r.lng], {
-            radius: r.radius,
-            color: r.color,
-            fillColor: r.color,
-            fillOpacity,
-            weight: 1
-          }).bindPopup(`<b>${escapeHtml(r.address)}</b><br/>${r.color}, ${r.radius}px`);
+          const e = r.entry;
+          const layer = getLayer(e.color);
 
-          marker.addTo(layer);
+          const popup = `
+            <div style="line-height:1.3">
+              <b>${escapeHtml(e.name || '(uden navn)')}</b><br/>
+              ${escapeHtml(e.address)}<br/>
+              <span style="color:#666">${escapeHtml(e.color)}, ${escapeHtml(e.radius)}px</span>
+            </div>
+          `;
+
+          L.circleMarker([r.lat, r.lng], {
+            radius: e.radius,
+            color: e.color,
+            fillColor: e.color,
+            fillOpacity: FIXED_FILL_OPACITY,
+            weight: 1
+          }).bindPopup(popup).addTo(layer);
+
           bounds.push([r.lat, r.lng]);
         }
 
@@ -312,33 +420,45 @@ Nørrebrogade 100, 2200 København N | #0066ff | 18
 
         if (bounds.length) map.fitBounds(bounds, { padding: [30, 30] });
 
-        // Status + fejlliste
-        let msg = `Færdig ✅\n`;
-        msg += `Matchede: ${okCount}\n`;
-        msg += `Fejl/ingen match: ${failCount}\n`;
-
-        const failed = results.filter(x => !x?.ok).slice(0, 12);
+        let msg = `Færdig ✅\nMatchede: ${okCount}\nFejl/ingen match: ${failCount}\n`;
+        const failed = results.filter(x => !x.ok).slice(0, 12);
         if (failed.length) {
           msg += `\nFørste ${failed.length} fejl:\n`;
-          for (const f of failed) msg += `- ${f.address}: ${f.error}\n`;
+          for (const f of failed) {
+            const n = f.entry?.name ? `${f.entry.name} — ` : '';
+            msg += `- ${n}${f.entry.address}: ${f.error}\n`;
+          }
         }
-
         setStatus(msg);
+
       } finally {
         btn.disabled = false;
       }
     });
 
-    document.getElementById('clear').addEventListener('click', () => {
-      clearAll();
-      setStatus('Ryddet.');
+    document.getElementById('clearMarkers').addEventListener('click', () => {
+      clearMapMarkersOnly();
+      setStatus('Ryddede markeringer på kortet.');
     });
 
-    function escapeHtml(str) {
-      return String(str).replace(/[&<>"']/g, (m) => ({
-        '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'
-      }[m]));
-    }
+    document.getElementById('clearAll').addEventListener('click', () => {
+      entries.splice(0, entries.length);
+      clearMapMarkersOnly();
+      renderTable();
+      setStatus('Slettede alle punkter i listen.');
+    });
+
+    // Init
+    populateColorSelect();
+    renderTable();
+
+    // Enter i adressefelt = tilføj
+    document.getElementById('address').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        document.getElementById('add').click();
+      }
+    });
   </script>
 </body>
 </html>
