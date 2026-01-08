@@ -42,7 +42,6 @@
 
     .status { margin-top: 10px; font-size: 12px; color:#333; white-space: pre-wrap; }
 
-    /* Tables */
     table { width: 100%; border-collapse: collapse; }
     th, td { text-align: left; font-size: 12px; padding: 8px 6px; border-bottom: 1px solid #f0f0f0; vertical-align: top; }
     th { color:#666; font-weight: 600; }
@@ -69,10 +68,8 @@
     }
     .mini.primary { background:#111; color:#fff; border-color:#111; }
 
-    /* Sections */
     .section { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 10px; }
 
-    /* details accordion */
     details {
       border: 1px solid var(--border);
       border-radius: 12px;
@@ -94,13 +91,11 @@
     summary::-webkit-details-marker { display: none; }
     .summaryRight { font-size: 12px; color:#666; font-weight: 500; }
 
-    /* filter content */
     .filterBtns { display:flex; gap:6px; margin-top: 8px; }
     .filterGrid { display:grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px 10px; margin-top: 10px; }
     .filterItem { display:flex; align-items:center; gap:8px; font-size:12px; }
     .filterItem input { transform: translateY(1px); }
 
-    /* inline controls in edit mode */
     .inlineInput { width: 100%; padding: 6px; border: 1px solid var(--border); border-radius: 10px; box-sizing: border-box; font-size: 12px; }
     .inlineSelect { width: 100%; padding: 6px; border: 1px solid var(--border); border-radius: 10px; box-sizing: border-box; font-size: 12px; background: #fff; }
     .inlineNumber { width: 100%; padding: 6px; border: 1px solid var(--border); border-radius: 10px; box-sizing: border-box; font-size: 12px; }
@@ -231,6 +226,14 @@
     const LIMIT_TO_CPH = true; // geokodning begrænses i baggrunden til kommunekode 0101
     const STORAGE_KEY = "valgsteder_state_v2";
 
+    // Kommunegrænse styling (match-ish til dit eksempel)
+    const CPH_BOUNDARY_STYLE = {
+      color: "#e11d48",
+      weight: 3,
+      fillColor: "#e11d48",
+      fillOpacity: 0.08
+    };
+
     const COLOR_PRESETS = [
       { label: "Rød",   value: "#e11d48" },
       { label: "Blå",   value: "#2563eb" },
@@ -249,6 +252,11 @@
       attribution: '&copy; OpenStreetMap'
     }).addTo(map);
 
+    // Pane til kommunegrænse (over tiles, under markører)
+    map.createPane('boundaryPane');
+    map.getPane('boundaryPane').style.zIndex = 450;
+    map.getPane('boundaryPane').style.pointerEvents = 'none';
+
     const markerGroup = L.layerGroup().addTo(map);
 
     // ----------------- State -----------------
@@ -260,10 +268,9 @@
 
     let currentOpacity = 0.55;
 
-    // marker refs (not stored)
     const markerById = new Map();
-    const editingIds = new Set(); // for UI only
-    const backups = new Map();    // id -> snapshot
+    const editingIds = new Set();
+    const backups = new Map();
 
     // ----------------- Helpers -----------------
     const statusEl = document.getElementById('status');
@@ -282,13 +289,13 @@
     function clampRadius(v) {
       const n = Number(v);
       if (!Number.isFinite(n)) return 12;
-      return Math.max(2, Math.min(20, Math.round(n))); // max 20
+      return Math.max(2, Math.min(20, Math.round(n)));
     }
 
     function clampOpacity(v) {
       const n = Number(v);
       if (!Number.isFinite(n)) return currentOpacity;
-      return Math.max(0, Math.min(1, Math.round(n * 20) / 20)); // step 0.05
+      return Math.max(0, Math.min(1, Math.round(n * 20) / 20)); // 0.05 step
     }
 
     function populateColorSelect(selectEl, defaultValue) {
@@ -383,6 +390,36 @@
       updateVisibility();
     }
 
+    // ----------------- Kommunegrænse: København -----------------
+    async function addCphMunicipalityBoundary() {
+      try {
+        // Hent alle kommuner som GeoJSON og filtrér på kode 0101 (København)
+        const url = "https://api.dataforsyningen.dk/kommuner/?format=geojson";
+        const res = await fetch(url, { headers: { "Accept": "application/json" } });
+        if (!res.ok) throw new Error("HTTP " + res.status);
+
+        const geo = await res.json();
+        const feature = (geo.features || []).find(f => String((f.properties || {}).kode || "") === "0101")
+                      || (geo.features || []).find(f => /københavn/i.test(String((f.properties || {}).navn || "")));
+
+        if (!feature) return;
+
+        const boundary = L.geoJSON(feature, {
+          pane: "boundaryPane",
+          style: () => CPH_BOUNDARY_STYLE
+        }).addTo(map);
+
+        // Lidt “ekstra”: sørg for at den bliver liggende under markører
+        boundary.bringToBack();
+
+        // Hvis du vil zoome til kommunen første gang:
+        // map.fitBounds(boundary.getBounds(), { padding: [20, 20] });
+      } catch (e) {
+        // Hvis den fejler (fx file:// CORS), ignorerer vi bare grænsen
+        console.warn("Kunne ikke indlæse kommunegrænse:", e);
+      }
+    }
+
     // ----------------- Persistence -----------------
     function saveState() {
       const state = {
@@ -429,8 +466,8 @@
             address: e.address || "",
             color: e.color || COLOR_PRESETS[0].value,
             radius: clampRadius(e.radius ?? 12),
-            lat: Number.isFinite(e.lat) ? e.lat : (typeof e.lat === "number" ? e.lat : undefined),
-            lng: Number.isFinite(e.lng) ? e.lng : (typeof e.lng === "number" ? e.lng : undefined),
+            lat: (typeof e.lat === "number" ? e.lat : undefined),
+            lng: (typeof e.lng === "number" ? e.lng : undefined),
           });
         }
       } catch {}
@@ -477,7 +514,6 @@
       if (!g) return { ok:false, error:"Ingen match" };
       e.lat = g.lat; e.lng = g.lng;
 
-      // (Re)create/update marker
       const m = ensureMarker(e);
       if (m) {
         m.setLatLng([e.lat, e.lng]);
@@ -554,12 +590,10 @@
     }
 
     function renderKredsSummaries() {
-      const el = document.getElementById('kredsSummary');
-      el.textContent = `${selectedKredse.size}/9 valgt`;
+      document.getElementById('kredsSummary').textContent = `${selectedKredse.size}/9 valgt`;
     }
     function renderColorSummaries() {
-      const el = document.getElementById('colorSummary');
-      el.textContent = `${selectedColors.size}/${COLOR_PRESETS.length} valgt`;
+      document.getElementById('colorSummary').textContent = `${selectedColors.size}/${COLOR_PRESETS.length} valgt`;
     }
     function updateSummaries() {
       const visible = entries.filter(isEntryVisible).length;
@@ -574,7 +608,6 @@
       const container = document.getElementById('kredsLists');
       container.innerHTML = '';
 
-      // grupper entries pr kreds
       const byK = new Map();
       for (let k=1;k<=9;k++) byK.set(k, []);
       for (const e of entries) byK.get(e.kreds)?.push(e);
@@ -582,7 +615,7 @@
       for (let k=1;k<=9;k++) {
         const list = byK.get(k) || [];
         const det = document.createElement('details');
-        det.open = list.length > 0; // åbn kun kredse der har noget
+        det.open = list.length > 0;
         det.style.marginTop = "10px";
 
         const visCount = list.filter(isEntryVisible).length;
@@ -614,7 +647,6 @@
           tbody.innerHTML = "";
           for (const e of list) {
             const tr = document.createElement('tr');
-
             const isEditing = editingIds.has(e.id);
 
             if (!isEditing) {
@@ -662,28 +694,19 @@
               `;
             }
 
-            // tone row when hidden by filters (optional)
             if (!isEntryVisible(e)) tr.style.opacity = "0.5";
-
             tbody.appendChild(tr);
 
-            // populate selects in edit mode
             if (isEditing) {
               const kredsSel = tr.querySelector(`select[data-editkreds="${CSS.escape(e.id)}"]`);
               const colorSel = tr.querySelector(`select[data-editcolor="${CSS.escape(e.id)}"]`);
-              if (kredsSel) {
-                populateKredsSelect(kredsSel);
-                kredsSel.value = String(e.kreds);
-              }
-              if (colorSel) {
-                populateColorSelect(colorSel, e.color);
-              }
+              if (kredsSel) { populateKredsSelect(kredsSel); kredsSel.value = String(e.kreds); }
+              if (colorSel) { populateColorSelect(colorSel, e.color); }
             }
           }
         }
       }
 
-      // bind actions (delegation over whole container)
       container.querySelectorAll('button[data-del]').forEach(btn => {
         btn.addEventListener('click', () => {
           const id = btn.getAttribute('data-del');
@@ -736,6 +759,7 @@
             e.lat = b.lat;
             e.lng = b.lng;
 
+            ensureMarker(e);
             updateMarkerStyleAndPopup(e);
             updateVisibility();
           }
@@ -777,12 +801,10 @@
           e.radius = newRad;
 
           try {
-            // re-geocode if address changed
             if (newAddr !== oldAddr) {
               const r = await geocodeAndSetCoords(e, { flyTo: true });
               if (!r.ok) throw new Error("Ingen match på adresse");
             } else {
-              // ensure marker exists and update style
               ensureMarker(e);
               updateMarkerStyleAndPopup(e);
               updateVisibility();
@@ -794,7 +816,6 @@
             renderKredsLists();
             setStatus('');
           } catch (err) {
-            // rollback
             e.kreds = b.kreds;
             e.name = b.name;
             e.address = b.address;
@@ -802,6 +823,7 @@
             e.radius = b.radius;
             e.lat = b.lat;
             e.lng = b.lng;
+
             ensureMarker(e);
             updateMarkerStyleAndPopup(e);
             updateVisibility();
@@ -840,11 +862,6 @@
         btn.disabled = false;
         return;
       }
-      if (entries.length >= 100) {
-        setStatus('Du har allerede 100 punkter i listen.');
-        btn.disabled = false;
-        return;
-      }
 
       const e = { id: uuid(), kreds, name, address, color, radius, lat: undefined, lng: undefined };
       entries.push(e);
@@ -855,7 +872,6 @@
         const r = await geocodeAndSetCoords(e, { flyTo: true });
         if (!r.ok) throw new Error("Ingen match");
 
-        // clear name/address, keep kreds
         document.getElementById('name').value = '';
         document.getElementById('address').value = '';
         document.getElementById('address').focus();
@@ -865,7 +881,6 @@
         updateVisibility();
         setStatus('');
       } catch (err) {
-        // remove entry on failure
         const idx = entries.findIndex(x => x.id === e.id);
         if (idx >= 0) entries.splice(idx, 1);
         renderKredsLists();
@@ -930,35 +945,34 @@
     populateColorSelect(document.getElementById('color'), COLOR_PRESETS[0].value);
     populateColorSelect(document.getElementById('bulkColor'), COLOR_PRESETS[0].value);
 
-    // load persisted state
     loadState();
 
-    // apply loaded opacity to UI
     opacityRange.value = String(currentOpacity);
     opacityNumber.value = String(currentOpacity);
 
-    // create markers for loaded entries
     for (const e of entries) {
       ensureMarker(e);
       updateMarkerStyleAndPopup(e);
     }
 
-    // render filters + lists
     renderKredsFilters();
     renderColorFilters();
     renderKredsLists();
     updateVisibility();
     updateSummaries();
 
+    // Tegn kommunegrænsen (overlay)
+    addCphMunicipalityBoundary();
+
     // bind
     document.getElementById('add').addEventListener('click', addEntry);
     document.getElementById('applyBulkRadius').addEventListener('click', applyBulkRadius);
     document.getElementById('applyBulkColor').addEventListener('click', applyBulkColor);
 
-    document.getElementById('kredsAll').addEventListener('click', () => { setAllKredse(true); saveState(); });
-    document.getElementById('kredsNone').addEventListener('click', () => { setAllKredse(false); saveState(); });
-    document.getElementById('colorAll').addEventListener('click', () => { setAllColors(true); saveState(); });
-    document.getElementById('colorNone').addEventListener('click', () => { setAllColors(false); saveState(); });
+    document.getElementById('kredsAll').addEventListener('click', () => setAllKredse(true));
+    document.getElementById('kredsNone').addEventListener('click', () => setAllKredse(false));
+    document.getElementById('colorAll').addEventListener('click', () => setAllColors(true));
+    document.getElementById('colorNone').addEventListener('click', () => setAllColors(false));
 
     opacityRange.addEventListener('input', () => syncOpacityFrom(opacityRange));
     opacityNumber.addEventListener('input', () => syncOpacityFrom(opacityNumber));
@@ -974,7 +988,6 @@
       if (!confirm("Vil du slette alle gemte valgsteder?")) return;
       clearStorage();
 
-      // clear runtime
       for (const m of markerById.values()) {
         if (markerGroup.hasLayer(m)) markerGroup.removeLayer(m);
         m.remove();
@@ -984,7 +997,6 @@
       editingIds.clear();
       backups.clear();
 
-      // reset filters (optional)
       selectedKredse.clear(); for (let k=1;k<=9;k++) selectedKredse.add(k);
       selectedColors.clear(); for (const c of COLOR_PRESETS) selectedColors.add(c.value);
 
