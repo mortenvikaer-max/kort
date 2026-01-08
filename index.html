@@ -92,7 +92,7 @@
     .summaryRight { font-size: 12px; color:#666; font-weight: 500; }
 
     .filterBtns { display:flex; gap:6px; margin-top: 8px; }
-    .filterGrid { display:grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px 10px; margin-top: 10px; }
+    .filterGrid { display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 10px; margin-top: 10px; }
     .filterItem { display:flex; align-items:center; gap:8px; font-size:12px; }
     .filterItem input { transform: translateY(1px); }
 
@@ -103,7 +103,7 @@
     .controlsRow { display:grid; grid-template-columns: 1fr 1fr; gap:10px; }
 
     @media (max-width: 420px) {
-      .filterGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .filterGrid { grid-template-columns: repeat(1, minmax(0, 1fr)); }
     }
   </style>
 </head>
@@ -133,13 +133,6 @@
         </div>
       </div>
 
-      <label for="opacityNumber">Opacity (0–1)</label>
-      <div class="controlsRow">
-        <input id="opacityRange" type="range" min="0" max="1" step="0.05" value="0.55" />
-        <input id="opacityNumber" type="number" min="0" max="1" step="0.05" value="0.55" />
-      </div>
-      <div class="hint">Opacity gælder for alle cirkler og gemmes automatisk.</div>
-
       <button id="add" class="primary">Tilføj</button>
 
       <div id="status" class="status"></div>
@@ -153,7 +146,7 @@
 
           <details open>
             <summary>
-              Kredse
+              Kredse / kategorier
               <span class="summaryRight" id="kredsSummary"></span>
             </summary>
             <div class="filterBtns">
@@ -161,18 +154,6 @@
               <button class="mini" id="kredsNone">Fjern alle</button>
             </div>
             <div class="filterGrid" id="kredsFilters"></div>
-          </details>
-
-          <details open>
-            <summary>
-              Farver
-              <span class="summaryRight" id="colorSummary"></span>
-            </summary>
-            <div class="filterBtns">
-              <button class="mini" id="colorAll">Vælg alle</button>
-              <button class="mini" id="colorNone">Fjern alle</button>
-            </div>
-            <div class="filterGrid" id="colorFilters"></div>
           </details>
         </details>
       </div>
@@ -190,7 +171,7 @@
       <div class="section">
         <details>
           <summary>
-            Masseændringer
+            Ændringer for alle valgsteder
             <span class="summaryRight"></span>
           </summary>
 
@@ -208,6 +189,13 @@
             </div>
           </div>
 
+          <label for="bulkOpacityNumber" style="margin-top:12px;">Opacity for alle cirkler (0–1)</label>
+          <div class="controlsRow">
+            <input id="bulkOpacityRange" type="range" min="0" max="1" step="0.05" value="0.55" />
+            <input id="bulkOpacityNumber" type="number" min="0" max="1" step="0.05" value="0.55" />
+          </div>
+          <div class="hint">Opacity gemmes automatisk.</div>
+
           <button id="clearAllStorage" class="mini" style="margin-top:12px;">Slet alle gemte valgsteder</button>
           <div class="hint">Dette fjerner alt gemt i browseren (localStorage).</div>
         </details>
@@ -224,10 +212,10 @@
     // ----------------- Konfiguration -----------------
     const PER_REQUEST_DELAY_MS = 80;
     const LIMIT_TO_CPH = true; // geokodning begrænses i baggrunden til kommunekode 0101
-    const STORAGE_KEY = "valgsteder_state_v3";
+    const STORAGE_KEY = "valgsteder_state_v4";
 
     // Overlay styling:
-    // - naboer + Frederiksberg: mørkegrå udfyldning
+    // - ring 1 + ring 2 kommuner: mørkegrå udfyldning
     // - København: rød outline, ingen fill
     const NEIGHBOR_STYLE = {
       color: "#2f2f2f",
@@ -252,6 +240,14 @@
     ];
     const COLOR_LABEL_BY_VALUE = Object.fromEntries(COLOR_PRESETS.map(c => [c.value, c.label]));
 
+    // Kreds/kategorier: værdier (keys) + labels
+    const KREDS_OPTIONS = [
+      ...Array.from({ length: 9 }, (_, i) => ({ key: String(i + 1), label: `${i + 1}. kreds` })),
+      { key: "new",    label: "Nyt valgsted" },
+      { key: "closed", label: "Nedlagt valgsted" }
+    ];
+    const KREDS_LABEL_BY_KEY = Object.fromEntries(KREDS_OPTIONS.map(o => [o.key, o.label]));
+
     // ----------------- Kort -----------------
     const map = L.map('map').setView([55.6761, 12.5683], 12);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -259,7 +255,7 @@
       attribution: '&copy; OpenStreetMap'
     }).addTo(map);
 
-    // Pane til nabokommuner (over tiles, under markører)
+    // Pane til ring 1+2 (over tiles, under markører)
     map.createPane('neighborsPane');
     map.getPane('neighborsPane').style.zIndex = 430;
     map.getPane('neighborsPane').style.pointerEvents = 'none';
@@ -273,11 +269,11 @@
     const markerGroup = L.layerGroup().addTo(map);
 
     // ----------------- State -----------------
-    // entry: {id, kreds, name, address, color, radius, lat, lng}
+    // entry: {id, kredsKey, name, address, color, radius, lat, lng}
     const entries = [];
 
-    const selectedKredse = new Set([1,2,3,4,5,6,7,8,9]);
-    const selectedColors = new Set(COLOR_PRESETS.map(c => c.value));
+    // Filtre: kun kredse/kategorier
+    const selectedKredse = new Set(KREDS_OPTIONS.map(o => o.key));
 
     let currentOpacity = 0.55;
 
@@ -322,23 +318,29 @@
       selectEl.value = defaultValue || COLOR_PRESETS[0].value;
     }
 
-    function populateKredsSelect(selectEl) {
+    function populateKredsSelect(selectEl, defaultKey) {
       selectEl.innerHTML = '';
       const opt0 = document.createElement('option');
       opt0.value = '';
-      opt0.textContent = 'Vælg kreds…';
+      opt0.textContent = 'Vælg…';
       selectEl.appendChild(opt0);
-      for (let i=1;i<=9;i++) {
+
+      for (const o of KREDS_OPTIONS) {
         const opt = document.createElement('option');
-        opt.value = String(i);
-        opt.textContent = String(i);
+        opt.value = o.key;
+        opt.textContent = o.label;
         selectEl.appendChild(opt);
       }
-      selectEl.value = '';
+
+      selectEl.value = defaultKey ?? '';
+    }
+
+    function labelForKredsKey(k) {
+      return KREDS_LABEL_BY_KEY[k] || String(k);
     }
 
     function isEntryVisible(e) {
-      return selectedKredse.has(e.kreds) && selectedColors.has(e.color);
+      return selectedKredse.has(e.kredsKey);
     }
 
     function markerPopupHtml(e) {
@@ -346,7 +348,7 @@
       return `
         <div style="line-height:1.3">
           <b>${escapeHtml(e.name || '(uden navn)')}</b><br/>
-          Kreds: ${escapeHtml(e.kreds)}<br/>
+          ${escapeHtml(labelForKredsKey(e.kredsKey))}<br/>
           ${escapeHtml(e.address)}<br/>
           <span style="color:#666">${escapeHtml(colorLabel)}, ${escapeHtml(e.radius)}px</span>
         </div>
@@ -403,15 +405,12 @@
       updateVisibility();
     }
 
-    // ----------------- Kommuner overlay -----------------
-    // Vi finder "nabokommuner" ved at se, hvilke kommuner der deler mindst ét grænsepunkt med København.
-    // + Frederiksberg (0147) sikres eksplicit.
+    // ----------------- Kommuner overlay (ring 1 + ring 2) -----------------
     function collectRoundedCoordKeys(geometry, decimals = 6) {
       const out = [];
       const round = (x) => Number(x).toFixed(decimals);
 
       function pushPoint(pt) {
-        // pt = [lng, lat]
         if (!pt || pt.length < 2) return;
         out.push(`${round(pt[0])},${round(pt[1])}`);
       }
@@ -432,53 +431,94 @@
       return out;
     }
 
-    async function addCphAndNeighborsOverlay() {
+    async function addCphRing2Overlay() {
       try {
         const url = "https://api.dataforsyningen.dk/kommuner/?format=geojson";
         const res = await fetch(url, { headers: { "Accept": "application/json" } });
         if (!res.ok) throw new Error("HTTP " + res.status);
         const geo = await res.json();
-
         const feats = geo.features || [];
-        const cph = feats.find(f => String((f.properties || {}).kode || "") === "0101")
-                || feats.find(f => /københavn/i.test(String((f.properties || {}).navn || "")));
 
+        const getCode = (f) => String((f.properties || {}).kode || "");
+        const cph = feats.find(f => getCode(f) === "0101") || feats.find(f => /københavn/i.test(String((f.properties||{}).navn||"")));
         if (!cph) return;
 
-        const cphKeys = new Set(collectRoundedCoordKeys(cph.geometry, 6));
+        // Byg index: coordKey -> set af kommunekoder der har det punkt
+        const keyToCodes = new Map();
+        const codeToFeature = new Map();
 
-        // Find naboer: alle features hvor mindst én coordinate matcher København
-        const neighbors = [];
         for (const f of feats) {
-          const code = String((f.properties || {}).kode || "");
-          if (code === "0101") continue;
-
-          // Frederiksberg medtages uanset hvad (0147)
-          if (code === "0147") { neighbors.push(f); continue; }
+          const code = getCode(f);
+          if (!code) continue;
+          codeToFeature.set(code, f);
 
           const keys = collectRoundedCoordKeys(f.geometry, 6);
-          let isNeighbor = false;
           for (const k of keys) {
-            if (cphKeys.has(k)) { isNeighbor = true; break; }
+            let s = keyToCodes.get(k);
+            if (!s) { s = new Set(); keyToCodes.set(k, s); }
+            s.add(code);
           }
-          if (isNeighbor) neighbors.push(f);
         }
 
-        // Tegn naboer (mørkegrå)
-        if (neighbors.length) {
-          L.geoJSON({ type: "FeatureCollection", features: neighbors }, {
+        // Adjacency: kommune -> set af naboer (deler mindst én key)
+        const adjacency = new Map();
+        for (const [k, codesSet] of keyToCodes.entries()) {
+          const codes = Array.from(codesSet);
+          if (codes.length < 2) continue;
+          for (let i=0;i<codes.length;i++) {
+            for (let j=i+1;j<codes.length;j++) {
+              const a = codes[i], b = codes[j];
+              if (!adjacency.has(a)) adjacency.set(a, new Set());
+              if (!adjacency.has(b)) adjacency.set(b, new Set());
+              adjacency.get(a).add(b);
+              adjacency.get(b).add(a);
+            }
+          }
+        }
+
+        // BFS fra København til dybde 2
+        const start = "0101";
+        const depth = new Map([[start, 0]]);
+        const q = [start];
+
+        while (q.length) {
+          const cur = q.shift();
+          const d = depth.get(cur);
+          if (d >= 2) continue;
+          const neigh = adjacency.get(cur) || new Set();
+          for (const n of neigh) {
+            if (!depth.has(n)) {
+              depth.set(n, d + 1);
+              q.push(n);
+            }
+          }
+        }
+
+        // Vi vil farve alle med depth 1 eller 2, plus Frederiksberg (0147), men ikke København selv.
+        const grayCodes = new Set();
+        for (const [code, d] of depth.entries()) {
+          if (code === start) continue;
+          if (d === 1 || d === 2) grayCodes.add(code);
+        }
+        grayCodes.add("0147"); // Frederiksberg med uanset hvad
+
+        const grayFeatures = [];
+        for (const code of grayCodes) {
+          const f = codeToFeature.get(code);
+          if (f) grayFeatures.push(f);
+        }
+
+        if (grayFeatures.length) {
+          L.geoJSON({ type: "FeatureCollection", features: grayFeatures }, {
             pane: "neighborsPane",
             style: () => NEIGHBOR_STYLE
           }).addTo(map);
         }
 
-        // Tegn København outline (rød, ingen fill)
         const cphOutline = L.geoJSON(cph, {
           pane: "cphOutlinePane",
           style: () => CPH_OUTLINE_STYLE
         }).addTo(map);
-
-        // Sørg for outline ligger øverst af overlays (stadig under markører)
         cphOutline.bringToFront();
 
       } catch (e) {
@@ -489,13 +529,12 @@
     // ----------------- Persistence -----------------
     function saveState() {
       const state = {
-        version: 3,
+        version: 4,
         opacity: currentOpacity,
         selectedKredse: [...selectedKredse],
-        selectedColors: [...selectedColors],
         entries: entries.map(e => ({
           id: e.id,
-          kreds: e.kreds,
+          kredsKey: e.kredsKey,
           name: e.name,
           address: e.address,
           color: e.color,
@@ -511,23 +550,21 @@
       try {
         const raw = localStorage.getItem(STORAGE_KEY);
         if (!raw) return;
-
         const s = JSON.parse(raw);
         if (!s || !Array.isArray(s.entries)) return;
 
         currentOpacity = clampOpacity(s.opacity ?? 0.55);
 
         selectedKredse.clear();
-        for (const k of (s.selectedKredse ?? [1,2,3,4,5,6,7,8,9])) selectedKredse.add(Number(k));
-
-        selectedColors.clear();
-        for (const c of (s.selectedColors ?? COLOR_PRESETS.map(x => x.value))) selectedColors.add(c);
+        const defaults = KREDS_OPTIONS.map(o => o.key);
+        for (const k of (s.selectedKredse ?? defaults)) selectedKredse.add(String(k));
 
         entries.splice(0, entries.length);
         for (const e of s.entries) {
+          const kredsKey = String(e.kredsKey ?? "");
           entries.push({
             id: e.id || uuid(),
-            kreds: Number(e.kreds) || 1,
+            kredsKey: KREDS_LABEL_BY_KEY[kredsKey] ? kredsKey : "1",
             name: e.name || "",
             address: e.address || "",
             color: e.color || COLOR_PRESETS[0].value,
@@ -591,95 +628,72 @@
       return { ok:true };
     }
 
-    // ----------------- Filters UI -----------------
+    // ----------------- Filters UI (kun kredse/kategorier) -----------------
     function renderKredsFilters() {
       const container = document.getElementById('kredsFilters');
       container.innerHTML = '';
-      for (let k=1;k<=9;k++) {
-        const id = `kreds_${k}`;
+
+      for (const o of KREDS_OPTIONS) {
+        const id = `k_${o.key}`;
         const lab = document.createElement('label');
         lab.className = 'filterItem';
         lab.innerHTML = `
-          <input type="checkbox" id="${id}" ${selectedKredse.has(k) ? 'checked' : ''}/>
-          <span>${k}</span>
+          <input type="checkbox" id="${id}" ${selectedKredse.has(o.key) ? 'checked' : ''}/>
+          <span>${escapeHtml(o.label)}</span>
         `;
         container.appendChild(lab);
+
         lab.querySelector('input').addEventListener('change', (ev) => {
-          if (ev.target.checked) selectedKredse.add(k);
-          else selectedKredse.delete(k);
+          if (ev.target.checked) selectedKredse.add(o.key);
+          else selectedKredse.delete(o.key);
           updateVisibility();
           saveState();
           renderKredsSummaries();
+          renderKredsLists();
         });
       }
       renderKredsSummaries();
     }
 
-    function renderColorFilters() {
-      const container = document.getElementById('colorFilters');
-      container.innerHTML = '';
-      for (const c of COLOR_PRESETS) {
-        const id = `color_${btoa(c.value).replace(/=/g,'')}`;
-        const lab = document.createElement('label');
-        lab.className = 'filterItem';
-        lab.innerHTML = `
-          <input type="checkbox" id="${id}" ${selectedColors.has(c.value) ? 'checked' : ''}/>
-          <span class="swatch" style="background:${c.value}"></span>
-          <span>${c.label}</span>
-        `;
-        container.appendChild(lab);
-        lab.querySelector('input').addEventListener('change', (ev) => {
-          if (ev.target.checked) selectedColors.add(c.value);
-          else selectedColors.delete(c.value);
-          updateVisibility();
-          saveState();
-          renderColorSummaries();
-        });
-      }
-      renderColorSummaries();
-    }
-
     function setAllKredse(on) {
       selectedKredse.clear();
-      if (on) for (let k=1;k<=9;k++) selectedKredse.add(k);
+      if (on) for (const o of KREDS_OPTIONS) selectedKredse.add(o.key);
       renderKredsFilters();
       updateVisibility();
       saveState();
-    }
-
-    function setAllColors(on) {
-      selectedColors.clear();
-      if (on) for (const c of COLOR_PRESETS) selectedColors.add(c.value);
-      renderColorFilters();
-      updateVisibility();
-      saveState();
+      renderKredsLists();
     }
 
     function renderKredsSummaries() {
-      document.getElementById('kredsSummary').textContent = `${selectedKredse.size}/9 valgt`;
+      document.getElementById('kredsSummary').textContent = `${selectedKredse.size}/${KREDS_OPTIONS.length} valgt`;
     }
-    function renderColorSummaries() {
-      document.getElementById('colorSummary').textContent = `${selectedColors.size}/${COLOR_PRESETS.length} valgt`;
-    }
+
     function updateSummaries() {
       const visible = entries.filter(isEntryVisible).length;
       document.getElementById('filterSummary').textContent = `${visible}/${entries.length} vises`;
       document.getElementById('listSummary').textContent = `${entries.length} total`;
       renderKredsSummaries();
-      renderColorSummaries();
     }
 
-    // ----------------- Liste pr. kreds -----------------
+    // ----------------- Liste pr. kreds/kategori -----------------
+    function groupEntriesByKredsKey() {
+      const byK = new Map();
+      for (const o of KREDS_OPTIONS) byK.set(o.key, []);
+      for (const e of entries) {
+        const k = byK.has(e.kredsKey) ? e.kredsKey : "1";
+        byK.get(k).push(e);
+      }
+      return byK;
+    }
+
     function renderKredsLists() {
       const container = document.getElementById('kredsLists');
       container.innerHTML = '';
 
-      const byK = new Map();
-      for (let k=1;k<=9;k++) byK.set(k, []);
-      for (const e of entries) byK.get(e.kreds)?.push(e);
+      const byK = groupEntriesByKredsKey();
 
-      for (let k=1;k<=9;k++) {
-        const list = byK.get(k) || [];
+      for (const o of KREDS_OPTIONS) {
+        const list = byK.get(o.key) || [];
         const det = document.createElement('details');
         det.open = list.length > 0;
         det.style.marginTop = "10px";
@@ -687,7 +701,7 @@
         const visCount = list.filter(isEntryVisible).length;
         det.innerHTML = `
           <summary>
-            Kreds ${k}
+            ${escapeHtml(o.label)}
             <span class="summaryRight">${list.length} (viser ${visCount})</span>
           </summary>
           <div style="margin-top:10px;">
@@ -701,7 +715,7 @@
                     <th style="width: 18%;">Handling</th>
                   </tr>
                 </thead>
-                <tbody id="tbody_k${k}"></tbody>
+                <tbody id="tbody_k_${o.key}"></tbody>
               </table>
             `}
           </div>
@@ -709,8 +723,9 @@
         container.appendChild(det);
 
         if (list.length) {
-          const tbody = det.querySelector(`#tbody_k${k}`);
+          const tbody = det.querySelector(`#tbody_k_${CSS.escape(o.key)}`);
           tbody.innerHTML = "";
+
           for (const e of list) {
             const tr = document.createElement('tr');
             const isEditing = editingIds.has(e.id);
@@ -766,13 +781,14 @@
             if (isEditing) {
               const kredsSel = tr.querySelector(`select[data-editkreds="${CSS.escape(e.id)}"]`);
               const colorSel = tr.querySelector(`select[data-editcolor="${CSS.escape(e.id)}"]`);
-              if (kredsSel) { populateKredsSelect(kredsSel); kredsSel.value = String(e.kreds); }
-              if (colorSel) { populateColorSelect(colorSel, e.color); }
+              if (kredsSel) populateKredsSelect(kredsSel, e.kredsKey);
+              if (colorSel) populateColorSelect(colorSel, e.color);
             }
           }
         }
       }
 
+      // bind actions
       container.querySelectorAll('button[data-del]').forEach(btn => {
         btn.addEventListener('click', () => {
           const id = btn.getAttribute('data-del');
@@ -817,7 +833,7 @@
           const e = entries.find(x => x.id === id);
           const b = backups.get(id);
           if (e && b) {
-            e.kreds = b.kreds;
+            e.kredsKey = b.kredsKey;
             e.name = b.name;
             e.address = b.address;
             e.color = b.color;
@@ -849,18 +865,18 @@
           const colorSel = container.querySelector(`select[data-editcolor="${CSS.escape(id)}"]`);
           const radInp   = container.querySelector(`input[data-editradius="${CSS.escape(id)}"]`);
 
-          const newKreds = Number(kredsSel?.value || 0);
+          const newKredsKey = String(kredsSel?.value || "");
           const newName  = (nameInp?.value ?? "").trim();
           const newAddr  = (addrInp?.value ?? "").trim();
           const newColor = (colorSel?.value ?? e.color);
           const newRad   = clampRadius(radInp?.value ?? e.radius);
 
-          if (!newKreds || newKreds < 1 || newKreds > 9) { setStatus('Vælg en kreds (1–9).'); return; }
+          if (!newKredsKey || !KREDS_LABEL_BY_KEY[newKredsKey]) { setStatus('Vælg en kreds/kategori.'); return; }
           if (!newAddr) { setStatus('Adresse må ikke være tom.'); return; }
 
           const oldAddr = e.address;
 
-          e.kreds = newKreds;
+          e.kredsKey = newKredsKey;
           e.name = newName;
           e.address = newAddr;
           e.color = newColor;
@@ -882,7 +898,7 @@
             renderKredsLists();
             setStatus('');
           } catch (err) {
-            e.kreds = b.kreds;
+            e.kredsKey = b.kredsKey;
             e.name = b.name;
             e.address = b.address;
             e.color = b.color;
@@ -911,15 +927,14 @@
       const btn = document.getElementById('add');
       btn.disabled = true;
 
-      const kredsVal = document.getElementById('kreds').value;
-      const kreds = Number(kredsVal);
+      const kredsKey = String(document.getElementById('kreds').value || "");
       const name = document.getElementById('name').value.trim();
       const address = document.getElementById('address').value.trim();
       const color = document.getElementById('color').value;
       const radius = clampRadius(document.getElementById('radiusNumber').value);
 
-      if (!kreds || kreds < 1 || kreds > 9) {
-        setStatus('Vælg en kreds (1–9) før du tilføjer.');
+      if (!kredsKey || !KREDS_LABEL_BY_KEY[kredsKey]) {
+        setStatus('Vælg en kreds/kategori før du tilføjer.');
         btn.disabled = false;
         return;
       }
@@ -929,7 +944,7 @@
         return;
       }
 
-      const e = { id: uuid(), kreds, name, address, color, radius, lat: undefined, lng: undefined };
+      const e = { id: uuid(), kredsKey, name, address, color, radius, lat: undefined, lng: undefined };
       entries.push(e);
       renderKredsLists();
       setStatus('');
@@ -993,14 +1008,14 @@
       setStatus('');
     }
 
-    // ----------------- Opacity sync -----------------
-    const opacityRange = document.getElementById('opacityRange');
-    const opacityNumber = document.getElementById('opacityNumber');
+    // Opacity (for alle) i "Ændringer for alle valgsteder"
+    const bulkOpacityRange = document.getElementById('bulkOpacityRange');
+    const bulkOpacityNumber = document.getElementById('bulkOpacityNumber');
 
-    function syncOpacityFrom(source) {
+    function syncBulkOpacityFrom(source) {
       currentOpacity = clampOpacity(source.value);
-      opacityRange.value = String(currentOpacity);
-      opacityNumber.value = String(currentOpacity);
+      bulkOpacityRange.value = String(currentOpacity);
+      bulkOpacityNumber.value = String(currentOpacity);
       updateAllMarkersOpacity();
       saveState();
       setStatus('');
@@ -1013,8 +1028,8 @@
 
     loadState();
 
-    opacityRange.value = String(currentOpacity);
-    opacityNumber.value = String(currentOpacity);
+    bulkOpacityRange.value = String(currentOpacity);
+    bulkOpacityNumber.value = String(currentOpacity);
 
     for (const e of entries) {
       ensureMarker(e);
@@ -1022,13 +1037,12 @@
     }
 
     renderKredsFilters();
-    renderColorFilters();
     renderKredsLists();
     updateVisibility();
     updateSummaries();
 
-    // Kommuner overlay: naboer mørkegrå + København rød outline
-    addCphAndNeighborsOverlay();
+    // Kommuner overlay: ring 1 + ring 2 grå + København rød outline
+    addCphRing2Overlay();
 
     // bind
     document.getElementById('add').addEventListener('click', addEntry);
@@ -1037,11 +1051,9 @@
 
     document.getElementById('kredsAll').addEventListener('click', () => setAllKredse(true));
     document.getElementById('kredsNone').addEventListener('click', () => setAllKredse(false));
-    document.getElementById('colorAll').addEventListener('click', () => setAllColors(true));
-    document.getElementById('colorNone').addEventListener('click', () => setAllColors(false));
 
-    opacityRange.addEventListener('input', () => syncOpacityFrom(opacityRange));
-    opacityNumber.addEventListener('input', () => syncOpacityFrom(opacityNumber));
+    bulkOpacityRange.addEventListener('input', () => syncBulkOpacityFrom(bulkOpacityRange));
+    bulkOpacityNumber.addEventListener('input', () => syncBulkOpacityFrom(bulkOpacityNumber));
 
     document.getElementById('address').addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
@@ -1063,11 +1075,10 @@
       editingIds.clear();
       backups.clear();
 
-      selectedKredse.clear(); for (let k=1;k<=9;k++) selectedKredse.add(k);
-      selectedColors.clear(); for (const c of COLOR_PRESETS) selectedColors.add(c.value);
+      selectedKredse.clear();
+      for (const o of KREDS_OPTIONS) selectedKredse.add(o.key);
 
       renderKredsFilters();
-      renderColorFilters();
       renderKredsLists();
       updateVisibility();
       setStatus('');
