@@ -224,14 +224,21 @@
     // ----------------- Konfiguration -----------------
     const PER_REQUEST_DELAY_MS = 80;
     const LIMIT_TO_CPH = true; // geokodning begrænses i baggrunden til kommunekode 0101
-    const STORAGE_KEY = "valgsteder_state_v2";
+    const STORAGE_KEY = "valgsteder_state_v3";
 
-    // Kommunegrænse styling (match-ish til dit eksempel)
-    const CPH_BOUNDARY_STYLE = {
+    // Overlay styling:
+    // - naboer + Frederiksberg: mørkegrå udfyldning
+    // - København: rød outline, ingen fill
+    const NEIGHBOR_STYLE = {
+      color: "#2f2f2f",
+      weight: 1,
+      fillColor: "#2f2f2f",
+      fillOpacity: 0.35
+    };
+    const CPH_OUTLINE_STYLE = {
       color: "#e11d48",
       weight: 3,
-      fillColor: "#e11d48",
-      fillOpacity: 0.08
+      fillOpacity: 0
     };
 
     const COLOR_PRESETS = [
@@ -252,11 +259,17 @@
       attribution: '&copy; OpenStreetMap'
     }).addTo(map);
 
-    // Pane til kommunegrænse (over tiles, under markører)
-    map.createPane('boundaryPane');
-    map.getPane('boundaryPane').style.zIndex = 450;
-    map.getPane('boundaryPane').style.pointerEvents = 'none';
+    // Pane til nabokommuner (over tiles, under markører)
+    map.createPane('neighborsPane');
+    map.getPane('neighborsPane').style.zIndex = 430;
+    map.getPane('neighborsPane').style.pointerEvents = 'none';
 
+    // Pane til København outline (over naboer, under markører)
+    map.createPane('cphOutlinePane');
+    map.getPane('cphOutlinePane').style.zIndex = 440;
+    map.getPane('cphOutlinePane').style.pointerEvents = 'none';
+
+    // Markører øverst
     const markerGroup = L.layerGroup().addTo(map);
 
     // ----------------- State -----------------
@@ -390,40 +403,93 @@
       updateVisibility();
     }
 
-    // ----------------- Kommunegrænse: København -----------------
-    async function addCphMunicipalityBoundary() {
+    // ----------------- Kommuner overlay -----------------
+    // Vi finder "nabokommuner" ved at se, hvilke kommuner der deler mindst ét grænsepunkt med København.
+    // + Frederiksberg (0147) sikres eksplicit.
+    function collectRoundedCoordKeys(geometry, decimals = 6) {
+      const out = [];
+      const round = (x) => Number(x).toFixed(decimals);
+
+      function pushPoint(pt) {
+        // pt = [lng, lat]
+        if (!pt || pt.length < 2) return;
+        out.push(`${round(pt[0])},${round(pt[1])}`);
+      }
+
+      if (!geometry) return out;
+
+      if (geometry.type === "Polygon") {
+        for (const ring of geometry.coordinates || []) {
+          for (const pt of ring || []) pushPoint(pt);
+        }
+      } else if (geometry.type === "MultiPolygon") {
+        for (const poly of geometry.coordinates || []) {
+          for (const ring of poly || []) {
+            for (const pt of ring || []) pushPoint(pt);
+          }
+        }
+      }
+      return out;
+    }
+
+    async function addCphAndNeighborsOverlay() {
       try {
-        // Hent alle kommuner som GeoJSON og filtrér på kode 0101 (København)
         const url = "https://api.dataforsyningen.dk/kommuner/?format=geojson";
         const res = await fetch(url, { headers: { "Accept": "application/json" } });
         if (!res.ok) throw new Error("HTTP " + res.status);
-
         const geo = await res.json();
-        const feature = (geo.features || []).find(f => String((f.properties || {}).kode || "") === "0101")
-                      || (geo.features || []).find(f => /københavn/i.test(String((f.properties || {}).navn || "")));
 
-        if (!feature) return;
+        const feats = geo.features || [];
+        const cph = feats.find(f => String((f.properties || {}).kode || "") === "0101")
+                || feats.find(f => /københavn/i.test(String((f.properties || {}).navn || "")));
 
-        const boundary = L.geoJSON(feature, {
-          pane: "boundaryPane",
-          style: () => CPH_BOUNDARY_STYLE
+        if (!cph) return;
+
+        const cphKeys = new Set(collectRoundedCoordKeys(cph.geometry, 6));
+
+        // Find naboer: alle features hvor mindst én coordinate matcher København
+        const neighbors = [];
+        for (const f of feats) {
+          const code = String((f.properties || {}).kode || "");
+          if (code === "0101") continue;
+
+          // Frederiksberg medtages uanset hvad (0147)
+          if (code === "0147") { neighbors.push(f); continue; }
+
+          const keys = collectRoundedCoordKeys(f.geometry, 6);
+          let isNeighbor = false;
+          for (const k of keys) {
+            if (cphKeys.has(k)) { isNeighbor = true; break; }
+          }
+          if (isNeighbor) neighbors.push(f);
+        }
+
+        // Tegn naboer (mørkegrå)
+        if (neighbors.length) {
+          L.geoJSON({ type: "FeatureCollection", features: neighbors }, {
+            pane: "neighborsPane",
+            style: () => NEIGHBOR_STYLE
+          }).addTo(map);
+        }
+
+        // Tegn København outline (rød, ingen fill)
+        const cphOutline = L.geoJSON(cph, {
+          pane: "cphOutlinePane",
+          style: () => CPH_OUTLINE_STYLE
         }).addTo(map);
 
-        // Lidt “ekstra”: sørg for at den bliver liggende under markører
-        boundary.bringToBack();
+        // Sørg for outline ligger øverst af overlays (stadig under markører)
+        cphOutline.bringToFront();
 
-        // Hvis du vil zoome til kommunen første gang:
-        // map.fitBounds(boundary.getBounds(), { padding: [20, 20] });
       } catch (e) {
-        // Hvis den fejler (fx file:// CORS), ignorerer vi bare grænsen
-        console.warn("Kunne ikke indlæse kommunegrænse:", e);
+        console.warn("Kunne ikke indlæse kommune-overlays:", e);
       }
     }
 
     // ----------------- Persistence -----------------
     function saveState() {
       const state = {
-        version: 2,
+        version: 3,
         opacity: currentOpacity,
         selectedKredse: [...selectedKredse],
         selectedColors: [...selectedColors],
@@ -961,8 +1027,8 @@
     updateVisibility();
     updateSummaries();
 
-    // Tegn kommunegrænsen (overlay)
-    addCphMunicipalityBoundary();
+    // Kommuner overlay: naboer mørkegrå + København rød outline
+    addCphAndNeighborsOverlay();
 
     // bind
     document.getElementById('add').addEventListener('click', addEntry);
