@@ -40,8 +40,9 @@
 
     .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 
-    .list { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 10px; }
-    .list h3 { font-size: 13px; margin: 0 0 8px; }
+    .status { margin-top: 10px; font-size: 12px; color:#333; white-space: pre-wrap; }
+
+    /* Tables */
     table { width: 100%; border-collapse: collapse; }
     th, td { text-align: left; font-size: 12px; padding: 8px 6px; border-bottom: 1px solid #f0f0f0; vertical-align: top; }
     th { color:#666; font-weight: 600; }
@@ -68,46 +69,43 @@
     }
     .mini.primary { background:#111; color:#fff; border-color:#111; }
 
-    .status { margin-top: 10px; font-size: 12px; color:#333; white-space: pre-wrap; }
+    /* Sections */
+    .section { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 10px; }
 
-    /* slider + preview */
-    .sliderRow {
-      display: grid;
-      grid-template-columns: 1fr 78px auto;
+    /* details accordion */
+    details {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: #fff;
+      padding: 8px 10px;
+      margin-top: 10px;
+    }
+    summary {
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 600;
+      color: #333;
+      list-style: none;
+      display: flex;
       align-items: center;
+      justify-content: space-between;
       gap: 10px;
     }
-    input[type="range"] { width: 100%; }
-    .previewDot {
-      border-radius: 50%;
-      border: 1px solid #0002;
-      background: #111;
-      display: inline-block;
-      flex: none;
-      width: 24px;
-      height: 24px;
-    }
+    summary::-webkit-details-marker { display: none; }
+    .summaryRight { font-size: 12px; color:#666; font-weight: 500; }
 
-    .bulk { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 10px; }
-    .bulk h3 { font-size: 13px; margin: 0 0 8px; }
-    .bulk .mini { margin-top: 8px; }
+    /* filter content */
+    .filterBtns { display:flex; gap:6px; margin-top: 8px; }
+    .filterGrid { display:grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px 10px; margin-top: 10px; }
+    .filterItem { display:flex; align-items:center; gap:8px; font-size:12px; }
+    .filterItem input { transform: translateY(1px); }
 
-    /* small inputs in table edit mode */
+    /* inline controls in edit mode */
     .inlineInput { width: 100%; padding: 6px; border: 1px solid var(--border); border-radius: 10px; box-sizing: border-box; font-size: 12px; }
     .inlineSelect { width: 100%; padding: 6px; border: 1px solid var(--border); border-radius: 10px; box-sizing: border-box; font-size: 12px; background: #fff; }
     .inlineNumber { width: 100%; padding: 6px; border: 1px solid var(--border); border-radius: 10px; box-sizing: border-box; font-size: 12px; }
 
-    /* Filtre */
-    .filters { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 10px; }
-    .filters h3 { font-size: 13px; margin: 0 0 8px; }
-    .filterBox { display:grid; gap:10px; }
-    .filterGroup { border:1px solid var(--border); border-radius: 12px; padding: 10px; background: #fff; }
-    .filterGroupTitle { display:flex; align-items:center; justify-content: space-between; gap:10px; margin-bottom: 8px; }
-    .filterGroupTitle b { font-size: 12px; color:#333; }
-    .filterBtns { display:flex; gap:6px; }
-    .filterGrid { display:grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px 10px; }
-    .filterItem { display:flex; align-items:center; gap:8px; font-size:12px; }
-    .filterItem input { transform: translateY(1px); }
+    .controlsRow { display:grid; grid-template-columns: 1fr 1fr; gap:10px; }
 
     @media (max-width: 420px) {
       .filterGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -134,90 +132,92 @@
           <label for="color">Farve</label>
           <select id="color"></select>
         </div>
-
         <div>
-          <label>Størrelse (px) (max 20)</label>
-          <div class="sliderRow">
-            <input id="radiusRange" type="range" min="2" max="20" value="12" />
-            <input id="radiusNumber" type="number" min="2" max="20" value="12" />
-            <span id="addPreviewDot" class="previewDot" title="Preview"></span>
-          </div>
+          <label for="radiusNumber">Størrelse (px) (max 20)</label>
+          <input id="radiusNumber" type="number" min="2" max="20" value="12" />
         </div>
       </div>
+
+      <label for="opacityNumber">Opacity (0–1)</label>
+      <div class="controlsRow">
+        <input id="opacityRange" type="range" min="0" max="1" step="0.05" value="0.55" />
+        <input id="opacityNumber" type="number" min="0" max="1" step="0.05" value="0.55" />
+      </div>
+      <div class="hint">Opacity gælder for alle cirkler og gemmes automatisk.</div>
 
       <button id="add" class="primary">Tilføj</button>
 
       <div id="status" class="status"></div>
 
-      <div class="bulk">
-        <h3>Redigér alle samlet</h3>
+      <div class="section">
+        <details open>
+          <summary>
+            Filtre
+            <span class="summaryRight" id="filterSummary"></span>
+          </summary>
 
-        <div class="row2">
-          <div>
-            <label>Sæt størrelse for alle (px) (max 20)</label>
-            <div class="sliderRow">
-              <input id="bulkRadiusRange" type="range" min="2" max="20" value="12" />
-              <input id="bulkRadiusNumber" type="number" min="2" max="20" value="12" />
-              <span id="bulkPreviewDot" class="previewDot" title="Preview"></span>
-            </div>
-            <button id="applyBulkRadius" class="mini primary">Anvend størrelse til alle</button>
-          </div>
-
-          <div>
-            <label for="bulkColor">Sæt farve for alle</label>
-            <select id="bulkColor"></select>
-            <button id="applyBulkColor" class="mini">Anvend farve til alle</button>
-          </div>
-        </div>
-      </div>
-
-      <div class="list">
-        <h3>Liste</h3>
-        <div class="hint">Du kan tilføje op til ca. 100 ad gangen.</div>
-
-        <table>
-          <thead>
-            <tr>
-              <th style="width: 10%;">Kreds</th>
-              <th style="width: 24%;">Navn</th>
-              <th>Adresse</th>
-              <th style="width: 18%;">Stil</th>
-              <th style="width: 20%;">Handling</th>
-            </tr>
-          </thead>
-          <tbody id="tbody">
-            <tr><td colspan="5" style="color:#777;">Ingen punkter endnu.</td></tr>
-          </tbody>
-        </table>
-      </div>
-
-      <div class="filters">
-        <h3>Filtre</h3>
-
-        <div class="filterBox">
-          <div class="filterGroup">
-            <div class="filterGroupTitle">
-              <b>Kredse</b>
-              <div class="filterBtns">
-                <button class="mini" id="kredsAll">Vælg alle</button>
-                <button class="mini" id="kredsNone">Fjern alle</button>
-              </div>
+          <details open>
+            <summary>
+              Kredse
+              <span class="summaryRight" id="kredsSummary"></span>
+            </summary>
+            <div class="filterBtns">
+              <button class="mini" id="kredsAll">Vælg alle</button>
+              <button class="mini" id="kredsNone">Fjern alle</button>
             </div>
             <div class="filterGrid" id="kredsFilters"></div>
-          </div>
+          </details>
 
-          <div class="filterGroup">
-            <div class="filterGroupTitle">
-              <b>Farver</b>
-              <div class="filterBtns">
-                <button class="mini" id="colorAll">Vælg alle</button>
-                <button class="mini" id="colorNone">Fjern alle</button>
-              </div>
+          <details open>
+            <summary>
+              Farver
+              <span class="summaryRight" id="colorSummary"></span>
+            </summary>
+            <div class="filterBtns">
+              <button class="mini" id="colorAll">Vælg alle</button>
+              <button class="mini" id="colorNone">Fjern alle</button>
             </div>
             <div class="filterGrid" id="colorFilters"></div>
-          </div>
-        </div>
+          </details>
+        </details>
       </div>
+
+      <div class="section">
+        <details open>
+          <summary>
+            Liste
+            <span class="summaryRight" id="listSummary"></span>
+          </summary>
+          <div id="kredsLists"></div>
+        </details>
+      </div>
+
+      <div class="section">
+        <details>
+          <summary>
+            Masseændringer
+            <span class="summaryRight"></span>
+          </summary>
+
+          <div class="row2" style="margin-top:10px;">
+            <div>
+              <label for="bulkRadiusNumber">Sæt størrelse for alle (px) (max 20)</label>
+              <input id="bulkRadiusNumber" type="number" min="2" max="20" value="12" />
+              <button id="applyBulkRadius" class="mini primary" style="margin-top:8px;">Anvend størrelse til alle</button>
+            </div>
+
+            <div>
+              <label for="bulkColor">Sæt farve for alle</label>
+              <select id="bulkColor"></select>
+              <button id="applyBulkColor" class="mini" style="margin-top:8px;">Anvend farve til alle</button>
+            </div>
+          </div>
+
+          <button id="clearAllStorage" class="mini" style="margin-top:12px;">Slet alle gemte valgsteder</button>
+          <div class="hint">Dette fjerner alt gemt i browseren (localStorage).</div>
+        </details>
+      </div>
+
     </div>
 
     <div id="map"></div>
@@ -226,12 +226,10 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
   <script>
-    // --------- Konfiguration ---------
-    const FIXED_FILL_OPACITY = 0.55;
+    // ----------------- Konfiguration -----------------
     const PER_REQUEST_DELAY_MS = 80;
-
-    // Begræns geokodning til Københavns kommune (0101) i baggrunden
-    const LIMIT_TO_CPH = true;
+    const LIMIT_TO_CPH = true; // geokodning begrænses i baggrunden til kommunekode 0101
+    const STORAGE_KEY = "valgsteder_state_v2";
 
     const COLOR_PRESETS = [
       { label: "Rød",   value: "#e11d48" },
@@ -244,25 +242,30 @@
     ];
     const COLOR_LABEL_BY_VALUE = Object.fromEntries(COLOR_PRESETS.map(c => [c.value, c.label]));
 
-    // --------- Kort ---------
+    // ----------------- Kort -----------------
     const map = L.map('map').setView([55.6761, 12.5683], 12);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
       attribution: '&copy; OpenStreetMap'
     }).addTo(map);
 
-    // Vi bruger én samlet gruppe til synlige markører, og styrer visning via filtre
     const markerGroup = L.layerGroup().addTo(map);
 
-    // --------- Data ---------
-    // entry: {id, kreds, name, address, color, radius, lat?, lng?, marker?, isEditing?}
+    // ----------------- State -----------------
+    // entry: {id, kreds, name, address, color, radius, lat, lng}
     const entries = [];
 
-    // Filtre: valgte kredse og farver
     const selectedKredse = new Set([1,2,3,4,5,6,7,8,9]);
     const selectedColors = new Set(COLOR_PRESETS.map(c => c.value));
 
-    // --------- UI helpers ---------
+    let currentOpacity = 0.55;
+
+    // marker refs (not stored)
+    const markerById = new Map();
+    const editingIds = new Set(); // for UI only
+    const backups = new Map();    // id -> snapshot
+
+    // ----------------- Helpers -----------------
     const statusEl = document.getElementById('status');
     function setStatus(msg) { statusEl.textContent = msg || ''; }
 
@@ -282,6 +285,12 @@
       return Math.max(2, Math.min(20, Math.round(n))); // max 20
     }
 
+    function clampOpacity(v) {
+      const n = Number(v);
+      if (!Number.isFinite(n)) return currentOpacity;
+      return Math.max(0, Math.min(1, Math.round(n * 20) / 20)); // step 0.05
+    }
+
     function populateColorSelect(selectEl, defaultValue) {
       selectEl.innerHTML = '';
       for (const c of COLOR_PRESETS) {
@@ -299,7 +308,6 @@
       opt0.value = '';
       opt0.textContent = 'Vælg kreds…';
       selectEl.appendChild(opt0);
-
       for (let i=1;i<=9;i++) {
         const opt = document.createElement('option');
         opt.value = String(i);
@@ -309,29 +317,130 @@
       selectEl.value = '';
     }
 
-    function setPreviewDot(dotEl, radius, color) {
-      const r = clampRadius(radius);
-      dotEl.style.width = (r * 2) + 'px';
-      dotEl.style.height = (r * 2) + 'px';
-      dotEl.style.background = color || '#111';
-    }
-
     function isEntryVisible(e) {
       return selectedKredse.has(e.kreds) && selectedColors.has(e.color);
     }
 
-    function updateVisibility() {
-      for (const e of entries) {
-        if (!e.marker) continue;
-        if (isEntryVisible(e)) {
-          if (!markerGroup.hasLayer(e.marker)) markerGroup.addLayer(e.marker);
-        } else {
-          if (markerGroup.hasLayer(e.marker)) markerGroup.removeLayer(e.marker);
-        }
-      }
+    function markerPopupHtml(e) {
+      const colorLabel = COLOR_LABEL_BY_VALUE[e.color] || '';
+      return `
+        <div style="line-height:1.3">
+          <b>${escapeHtml(e.name || '(uden navn)')}</b><br/>
+          Kreds: ${escapeHtml(e.kreds)}<br/>
+          ${escapeHtml(e.address)}<br/>
+          <span style="color:#666">${escapeHtml(colorLabel)}, ${escapeHtml(e.radius)}px</span>
+        </div>
+      `;
     }
 
-    // --------- DAWA geokodning ---------
+    function ensureMarker(e) {
+      let m = markerById.get(e.id);
+      if (!m && Number.isFinite(e.lat) && Number.isFinite(e.lng)) {
+        m = L.circleMarker([e.lat, e.lng], {
+          radius: e.radius,
+          color: e.color,
+          fillColor: e.color,
+          fillOpacity: currentOpacity,
+          weight: 1
+        }).bindPopup(markerPopupHtml(e));
+        markerById.set(e.id, m);
+      }
+      return m || null;
+    }
+
+    function updateMarkerStyleAndPopup(e) {
+      const m = markerById.get(e.id);
+      if (!m) return;
+      m.setStyle({
+        color: e.color,
+        fillColor: e.color,
+        fillOpacity: currentOpacity,
+        weight: 1
+      });
+      m.setRadius(e.radius);
+      m.bindPopup(markerPopupHtml(e));
+    }
+
+    function updateVisibility() {
+      for (const e of entries) {
+        const m = ensureMarker(e);
+        if (!m) continue;
+        if (isEntryVisible(e)) {
+          if (!markerGroup.hasLayer(m)) markerGroup.addLayer(m);
+        } else {
+          if (markerGroup.hasLayer(m)) markerGroup.removeLayer(m);
+        }
+      }
+      updateSummaries();
+    }
+
+    function updateAllMarkersOpacity() {
+      for (const e of entries) {
+        const m = markerById.get(e.id);
+        if (!m) continue;
+        m.setStyle({ fillOpacity: currentOpacity });
+      }
+      updateVisibility();
+    }
+
+    // ----------------- Persistence -----------------
+    function saveState() {
+      const state = {
+        version: 2,
+        opacity: currentOpacity,
+        selectedKredse: [...selectedKredse],
+        selectedColors: [...selectedColors],
+        entries: entries.map(e => ({
+          id: e.id,
+          kreds: e.kreds,
+          name: e.name,
+          address: e.address,
+          color: e.color,
+          radius: e.radius,
+          lat: e.lat,
+          lng: e.lng
+        }))
+      };
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch {}
+    }
+
+    function loadState() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return;
+
+        const s = JSON.parse(raw);
+        if (!s || !Array.isArray(s.entries)) return;
+
+        currentOpacity = clampOpacity(s.opacity ?? 0.55);
+
+        selectedKredse.clear();
+        for (const k of (s.selectedKredse ?? [1,2,3,4,5,6,7,8,9])) selectedKredse.add(Number(k));
+
+        selectedColors.clear();
+        for (const c of (s.selectedColors ?? COLOR_PRESETS.map(x => x.value))) selectedColors.add(c);
+
+        entries.splice(0, entries.length);
+        for (const e of s.entries) {
+          entries.push({
+            id: e.id || uuid(),
+            kreds: Number(e.kreds) || 1,
+            name: e.name || "",
+            address: e.address || "",
+            color: e.color || COLOR_PRESETS[0].value,
+            radius: clampRadius(e.radius ?? 12),
+            lat: Number.isFinite(e.lat) ? e.lat : (typeof e.lat === "number" ? e.lat : undefined),
+            lng: Number.isFinite(e.lng) ? e.lng : (typeof e.lng === "number" ? e.lng : undefined),
+          });
+        }
+      } catch {}
+    }
+
+    function clearStorage() {
+      try { localStorage.removeItem(STORAGE_KEY); } catch {}
+    }
+
+    // ----------------- DAWA geokodning -----------------
     async function geocodeDAWA(address) {
       const params = new URLSearchParams();
       params.set('q', address);
@@ -362,301 +471,354 @@
       throw lastErr || new Error('Geokodning fejlede');
     }
 
-    function markerPopupHtml(e) {
-      const colorLabel = COLOR_LABEL_BY_VALUE[e.color] || '';
-      return `
-        <div style="line-height:1.3">
-          <b>${escapeHtml(e.name || '(uden navn)')}</b><br/>
-          Kreds: ${escapeHtml(e.kreds)}<br/>
-          ${escapeHtml(e.address)}<br/>
-          <span style="color:#666">${escapeHtml(colorLabel)}, ${escapeHtml(e.radius)}px</span>
-        </div>
-      `;
-    }
-
-    function updateMarkerStyleAndPopup(e) {
-      if (!e.marker) return;
-      e.marker.setStyle({
-        color: e.color,
-        fillColor: e.color,
-        fillOpacity: FIXED_FILL_OPACITY,
-        weight: 1
-      });
-      e.marker.setRadius(e.radius);
-      e.marker.bindPopup(markerPopupHtml(e));
-    }
-
-    async function geocodeAndPlaceOrMoveMarker(e, { flyTo = true } = {}) {
+    async function geocodeAndSetCoords(e, { flyTo = true } = {}) {
       await new Promise(r => setTimeout(r, PER_REQUEST_DELAY_MS));
-
       const g = await geocodeDAWA(e.address);
-      if (!g) return { ok: false, error: 'Ingen match' };
+      if (!g) return { ok:false, error:"Ingen match" };
+      e.lat = g.lat; e.lng = g.lng;
 
-      e.lat = g.lat;
-      e.lng = g.lng;
-
-      if (!e.marker) {
-        e.marker = L.circleMarker([e.lat, e.lng], {
-          radius: e.radius,
-          color: e.color,
-          fillColor: e.color,
-          fillOpacity: FIXED_FILL_OPACITY,
-          weight: 1
-        }).bindPopup(markerPopupHtml(e));
-      } else {
-        e.marker.setLatLng([e.lat, e.lng]);
+      // (Re)create/update marker
+      const m = ensureMarker(e);
+      if (m) {
+        m.setLatLng([e.lat, e.lng]);
+        updateMarkerStyleAndPopup(e);
       }
-
-      updateMarkerStyleAndPopup(e);
       updateVisibility();
 
       if (flyTo) map.setView([e.lat, e.lng], Math.max(map.getZoom(), 14));
-      return { ok: true };
+      return { ok:true };
     }
 
-    // --------- Table rendering (view + edit) ---------
-    function renderTable() {
-      const tbody = document.getElementById('tbody');
-      tbody.innerHTML = '';
+    // ----------------- Filters UI -----------------
+    function renderKredsFilters() {
+      const container = document.getElementById('kredsFilters');
+      container.innerHTML = '';
+      for (let k=1;k<=9;k++) {
+        const id = `kreds_${k}`;
+        const lab = document.createElement('label');
+        lab.className = 'filterItem';
+        lab.innerHTML = `
+          <input type="checkbox" id="${id}" ${selectedKredse.has(k) ? 'checked' : ''}/>
+          <span>${k}</span>
+        `;
+        container.appendChild(lab);
+        lab.querySelector('input').addEventListener('change', (ev) => {
+          if (ev.target.checked) selectedKredse.add(k);
+          else selectedKredse.delete(k);
+          updateVisibility();
+          saveState();
+          renderKredsSummaries();
+        });
+      }
+      renderKredsSummaries();
+    }
 
-      if (entries.length === 0) {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `<td colspan="5" style="color:#777;">Ingen punkter endnu.</td>`;
-        tbody.appendChild(tr);
-        return;
+    function renderColorFilters() {
+      const container = document.getElementById('colorFilters');
+      container.innerHTML = '';
+      for (const c of COLOR_PRESETS) {
+        const id = `color_${btoa(c.value).replace(/=/g,'')}`;
+        const lab = document.createElement('label');
+        lab.className = 'filterItem';
+        lab.innerHTML = `
+          <input type="checkbox" id="${id}" ${selectedColors.has(c.value) ? 'checked' : ''}/>
+          <span class="swatch" style="background:${c.value}"></span>
+          <span>${c.label}</span>
+        `;
+        container.appendChild(lab);
+        lab.querySelector('input').addEventListener('change', (ev) => {
+          if (ev.target.checked) selectedColors.add(c.value);
+          else selectedColors.delete(c.value);
+          updateVisibility();
+          saveState();
+          renderColorSummaries();
+        });
+      }
+      renderColorSummaries();
+    }
+
+    function setAllKredse(on) {
+      selectedKredse.clear();
+      if (on) for (let k=1;k<=9;k++) selectedKredse.add(k);
+      renderKredsFilters();
+      updateVisibility();
+      saveState();
+    }
+
+    function setAllColors(on) {
+      selectedColors.clear();
+      if (on) for (const c of COLOR_PRESETS) selectedColors.add(c.value);
+      renderColorFilters();
+      updateVisibility();
+      saveState();
+    }
+
+    function renderKredsSummaries() {
+      const el = document.getElementById('kredsSummary');
+      el.textContent = `${selectedKredse.size}/9 valgt`;
+    }
+    function renderColorSummaries() {
+      const el = document.getElementById('colorSummary');
+      el.textContent = `${selectedColors.size}/${COLOR_PRESETS.length} valgt`;
+    }
+    function updateSummaries() {
+      const visible = entries.filter(isEntryVisible).length;
+      document.getElementById('filterSummary').textContent = `${visible}/${entries.length} vises`;
+      document.getElementById('listSummary').textContent = `${entries.length} total`;
+      renderKredsSummaries();
+      renderColorSummaries();
+    }
+
+    // ----------------- Liste pr. kreds -----------------
+    function renderKredsLists() {
+      const container = document.getElementById('kredsLists');
+      container.innerHTML = '';
+
+      // grupper entries pr kreds
+      const byK = new Map();
+      for (let k=1;k<=9;k++) byK.set(k, []);
+      for (const e of entries) byK.get(e.kreds)?.push(e);
+
+      for (let k=1;k<=9;k++) {
+        const list = byK.get(k) || [];
+        const det = document.createElement('details');
+        det.open = list.length > 0; // åbn kun kredse der har noget
+        det.style.marginTop = "10px";
+
+        const visCount = list.filter(isEntryVisible).length;
+        det.innerHTML = `
+          <summary>
+            Kreds ${k}
+            <span class="summaryRight">${list.length} (viser ${visCount})</span>
+          </summary>
+          <div style="margin-top:10px;">
+            ${list.length === 0 ? `<div class="hint">Ingen valgsteder.</div>` : `
+              <table>
+                <thead>
+                  <tr>
+                    <th style="width: 26%;">Navn</th>
+                    <th>Adresse</th>
+                    <th style="width: 18%;">Stil</th>
+                    <th style="width: 18%;">Handling</th>
+                  </tr>
+                </thead>
+                <tbody id="tbody_k${k}"></tbody>
+              </table>
+            `}
+          </div>
+        `;
+        container.appendChild(det);
+
+        if (list.length) {
+          const tbody = det.querySelector(`#tbody_k${k}`);
+          tbody.innerHTML = "";
+          for (const e of list) {
+            const tr = document.createElement('tr');
+
+            const isEditing = editingIds.has(e.id);
+
+            if (!isEditing) {
+              const styleHtml = `
+                <span class="pill">
+                  <span class="swatch" style="background:${escapeHtml(e.color)}"></span>
+                  ${escapeHtml(e.radius)}px
+                </span>
+              `;
+
+              tr.innerHTML = `
+                <td>${escapeHtml(e.name || '(uden navn)')}</td>
+                <td>${escapeHtml(e.address)}</td>
+                <td>${styleHtml}</td>
+                <td>
+                  <div class="actions">
+                    <button class="mini" data-edit="${e.id}">Redigér</button>
+                    <button class="mini" data-del="${e.id}">Slet</button>
+                  </div>
+                </td>
+              `;
+            } else {
+              tr.innerHTML = `
+                <td>
+                  <div style="display:grid; gap:6px;">
+                    <select class="inlineSelect" data-editkreds="${e.id}"></select>
+                    <input class="inlineInput" data-editname="${e.id}" value="${escapeHtml(e.name || '')}" placeholder="Navn"/>
+                  </div>
+                </td>
+                <td>
+                  <input class="inlineInput" data-editaddr="${e.id}" value="${escapeHtml(e.address || '')}" placeholder="Adresse"/>
+                </td>
+                <td>
+                  <div style="display:grid; gap:6px;">
+                    <select class="inlineSelect" data-editcolor="${e.id}"></select>
+                    <input class="inlineNumber" type="number" min="2" max="20" data-editradius="${e.id}" value="${escapeHtml(e.radius)}"/>
+                  </div>
+                </td>
+                <td>
+                  <div class="actions">
+                    <button class="mini primary" data-save="${e.id}">Gem</button>
+                    <button class="mini" data-cancel="${e.id}">Fortryd</button>
+                  </div>
+                </td>
+              `;
+            }
+
+            // tone row when hidden by filters (optional)
+            if (!isEntryVisible(e)) tr.style.opacity = "0.5";
+
+            tbody.appendChild(tr);
+
+            // populate selects in edit mode
+            if (isEditing) {
+              const kredsSel = tr.querySelector(`select[data-editkreds="${CSS.escape(e.id)}"]`);
+              const colorSel = tr.querySelector(`select[data-editcolor="${CSS.escape(e.id)}"]`);
+              if (kredsSel) {
+                populateKredsSelect(kredsSel);
+                kredsSel.value = String(e.kreds);
+              }
+              if (colorSel) {
+                populateColorSelect(colorSel, e.color);
+              }
+            }
+          }
+        }
       }
 
-      for (const e of entries) {
-        const tr = document.createElement('tr');
-
-        if (!e.isEditing) {
-          const styleHtml = `
-            <span class="pill">
-              <span class="swatch" style="background:${escapeHtml(e.color)}"></span>
-              ${escapeHtml(e.radius)}px
-            </span>
-          `;
-
-          tr.innerHTML = `
-            <td>${escapeHtml(e.kreds)}</td>
-            <td>${escapeHtml(e.name || '(uden navn)')}</td>
-            <td>${escapeHtml(e.address)}</td>
-            <td>${styleHtml}</td>
-            <td>
-              <div class="actions">
-                <button class="mini" data-edit="${e.id}">Redigér</button>
-                <button class="mini" data-del="${e.id}">Slet</button>
-              </div>
-            </td>
-          `;
-        } else {
-          const colorSelectId = `editColor_${e.id}`;
-          const kredsSelectId = `editKreds_${e.id}`;
-          const radiusRangeId = `editRadiusRange_${e.id}`;
-          const radiusNumberId = `editRadiusNumber_${e.id}`;
-          const previewId = `editPreview_${e.id}`;
-
-          tr.innerHTML = `
-            <td>
-              <select class="inlineSelect" id="${kredsSelectId}" data-kreds="${e.id}"></select>
-            </td>
-            <td>
-              <input class="inlineInput" data-name="${e.id}" value="${escapeHtml(e.name || '')}" placeholder="Navn"/>
-            </td>
-            <td>
-              <input class="inlineInput" data-address="${e.id}" value="${escapeHtml(e.address || '')}" placeholder="Adresse"/>
-            </td>
-            <td>
-              <div style="display:grid; gap:6px;">
-                <select class="inlineSelect" id="${colorSelectId}" data-color="${e.id}"></select>
-                <div class="sliderRow">
-                  <input id="${radiusRangeId}" type="range" min="2" max="20" value="${escapeHtml(e.radius)}" data-radiusrange="${e.id}"/>
-                  <input id="${radiusNumberId}" class="inlineNumber" type="number" min="2" max="20" value="${escapeHtml(e.radius)}" data-radiusnumber="${e.id}"/>
-                  <span id="${previewId}" class="previewDot"></span>
-                </div>
-              </div>
-            </td>
-            <td>
-              <div class="actions">
-                <button class="mini primary" data-save="${e.id}">Gem</button>
-                <button class="mini" data-cancel="${e.id}">Fortryd</button>
-              </div>
-            </td>
-          `;
-        }
-
-        tbody.appendChild(tr);
-
-        // wiring for edit mode
-        if (e.isEditing) {
-          const selColor = document.getElementById(`editColor_${e.id}`);
-          const selKreds = document.getElementById(`editKreds_${e.id}`);
-          if (selColor) populateColorSelect(selColor, e.color);
-          if (selKreds) {
-            populateKredsSelect(selKreds);
-            selKreds.value = String(e.kreds);
-          }
-
-          const rangeEl = document.getElementById(`editRadiusRange_${e.id}`);
-          const numberEl = document.getElementById(`editRadiusNumber_${e.id}`);
-          const previewEl = document.getElementById(`editPreview_${e.id}`);
-
-          if (rangeEl && numberEl && previewEl) {
-            const sync = (source) => {
-              const v = clampRadius(source.value);
-              rangeEl.value = String(v);
-              numberEl.value = String(v);
-              setPreviewDot(previewEl, v, selColor ? selColor.value : e.color);
-            };
-            sync(numberEl);
-
-            rangeEl.addEventListener('input', () => sync(rangeEl));
-            numberEl.addEventListener('input', () => sync(numberEl));
-            if (selColor) selColor.addEventListener('change', () => setPreviewDot(previewEl, clampRadius(numberEl.value), selColor.value));
-          }
-        }
-      }
-
-      // delete
-      tbody.querySelectorAll('button[data-del]').forEach(btn => {
+      // bind actions (delegation over whole container)
+      container.querySelectorAll('button[data-del]').forEach(btn => {
         btn.addEventListener('click', () => {
           const id = btn.getAttribute('data-del');
           const idx = entries.findIndex(x => x.id === id);
           if (idx < 0) return;
 
           const e = entries[idx];
-          if (e.marker) {
-            markerGroup.removeLayer(e.marker);
-            e.marker.remove();
+          const m = markerById.get(e.id);
+          if (m) {
+            if (markerGroup.hasLayer(m)) markerGroup.removeLayer(m);
+            m.remove();
+            markerById.delete(e.id);
           }
-          entries.splice(idx, 1);
 
-          renderTable();
+          editingIds.delete(e.id);
+          backups.delete(e.id);
+
+          entries.splice(idx, 1);
+          saveState();
+          renderKredsLists();
+          updateVisibility();
           setStatus('');
         });
       });
 
-      // edit
-      tbody.querySelectorAll('button[data-edit]').forEach(btn => {
+      container.querySelectorAll('button[data-edit]').forEach(btn => {
         btn.addEventListener('click', () => {
           const id = btn.getAttribute('data-edit');
           const e = entries.find(x => x.id === id);
           if (!e) return;
 
-          e._backup = { kreds: e.kreds, name: e.name, address: e.address, color: e.color, radius: e.radius };
-          e.isEditing = true;
-          renderTable();
+          backups.set(id, { ...e });
+          editingIds.add(id);
+          renderKredsLists();
           setStatus('');
         });
       });
 
-      // cancel
-      tbody.querySelectorAll('button[data-cancel]').forEach(btn => {
+      container.querySelectorAll('button[data-cancel]').forEach(btn => {
         btn.addEventListener('click', () => {
           const id = btn.getAttribute('data-cancel');
           const e = entries.find(x => x.id === id);
-          if (!e) return;
+          const b = backups.get(id);
+          if (e && b) {
+            e.kreds = b.kreds;
+            e.name = b.name;
+            e.address = b.address;
+            e.color = b.color;
+            e.radius = b.radius;
+            e.lat = b.lat;
+            e.lng = b.lng;
 
-          if (e._backup) {
-            e.kreds = e._backup.kreds;
-            e.name = e._backup.name;
-            e.address = e._backup.address;
-            e.color = e._backup.color;
-            e.radius = e._backup.radius;
-            delete e._backup;
             updateMarkerStyleAndPopup(e);
             updateVisibility();
           }
-          e.isEditing = false;
-          renderTable();
+          editingIds.delete(id);
+          backups.delete(id);
+          renderKredsLists();
           setStatus('');
         });
       });
 
-      // save
-      tbody.querySelectorAll('button[data-save]').forEach(btn => {
+      container.querySelectorAll('button[data-save]').forEach(btn => {
         btn.addEventListener('click', async () => {
           const id = btn.getAttribute('data-save');
           const e = entries.find(x => x.id === id);
-          if (!e) return;
+          const b = backups.get(id);
+          if (!e || !b) return;
 
-          const kredsSel = tbody.querySelector(`select[data-kreds="${CSS.escape(id)}"]`);
-          const nameInput = tbody.querySelector(`input[data-name="${CSS.escape(id)}"]`);
-          const addrInput = tbody.querySelector(`input[data-address="${CSS.escape(id)}"]`);
-          const colorSel  = tbody.querySelector(`select[data-color="${CSS.escape(id)}"]`);
-          const numberEl  = tbody.querySelector(`input[data-radiusnumber="${CSS.escape(id)}"]`);
+          const kredsSel = container.querySelector(`select[data-editkreds="${CSS.escape(id)}"]`);
+          const nameInp  = container.querySelector(`input[data-editname="${CSS.escape(id)}"]`);
+          const addrInp  = container.querySelector(`input[data-editaddr="${CSS.escape(id)}"]`);
+          const colorSel = container.querySelector(`select[data-editcolor="${CSS.escape(id)}"]`);
+          const radInp   = container.querySelector(`input[data-editradius="${CSS.escape(id)}"]`);
 
           const newKreds = Number(kredsSel?.value || 0);
-          const newName = (nameInput?.value ?? '').trim();
-          const newAddress = (addrInput?.value ?? '').trim();
+          const newName  = (nameInp?.value ?? "").trim();
+          const newAddr  = (addrInp?.value ?? "").trim();
           const newColor = (colorSel?.value ?? e.color);
-          const newRadius = clampRadius(numberEl?.value ?? e.radius);
+          const newRad   = clampRadius(radInp?.value ?? e.radius);
 
           if (!newKreds || newKreds < 1 || newKreds > 9) { setStatus('Vælg en kreds (1–9).'); return; }
-          if (!newAddress) { setStatus('Adresse må ikke være tom.'); return; }
+          if (!newAddr) { setStatus('Adresse må ikke være tom.'); return; }
 
-          const oldAddress = e.address;
+          const oldAddr = e.address;
 
           e.kreds = newKreds;
           e.name = newName;
-          e.address = newAddress;
+          e.address = newAddr;
           e.color = newColor;
-          e.radius = newRadius;
+          e.radius = newRad;
 
           try {
-            if (newAddress !== oldAddress) {
-              const r = await geocodeAndPlaceOrMoveMarker(e, { flyTo: true });
-              if (!r.ok) {
-                if (e._backup) {
-                  e.kreds = e._backup.kreds;
-                  e.name = e._backup.name;
-                  e.address = e._backup.address;
-                  e.color = e._backup.color;
-                  e.radius = e._backup.radius;
-                  delete e._backup;
-                  updateMarkerStyleAndPopup(e);
-                  updateVisibility();
-                }
-                setStatus('Kunne ikke finde adressen (ingen match).');
-                e.isEditing = false;
-                renderTable();
-                return;
-              }
+            // re-geocode if address changed
+            if (newAddr !== oldAddr) {
+              const r = await geocodeAndSetCoords(e, { flyTo: true });
+              if (!r.ok) throw new Error("Ingen match på adresse");
             } else {
+              // ensure marker exists and update style
+              ensureMarker(e);
               updateMarkerStyleAndPopup(e);
               updateVisibility();
             }
 
-            e.isEditing = false;
-            delete e._backup;
-
-            renderTable();
+            editingIds.delete(id);
+            backups.delete(id);
+            saveState();
+            renderKredsLists();
             setStatus('');
           } catch (err) {
-            if (e._backup) {
-              e.kreds = e._backup.kreds;
-              e.name = e._backup.name;
-              e.address = e._backup.address;
-              e.color = e._backup.color;
-              e.radius = e._backup.radius;
-              delete e._backup;
-              updateMarkerStyleAndPopup(e);
-              updateVisibility();
-            }
-            e.isEditing = false;
-            renderTable();
+            // rollback
+            e.kreds = b.kreds;
+            e.name = b.name;
+            e.address = b.address;
+            e.color = b.color;
+            e.radius = b.radius;
+            e.lat = b.lat;
+            e.lng = b.lng;
+            ensureMarker(e);
+            updateMarkerStyleAndPopup(e);
+            updateVisibility();
 
             setStatus(
-              'Kunne ikke opdatere.\n' +
+              'Kunne ikke gemme ændringer.\n' +
               'Hvis du åbner som file://, så prøv via http://localhost (lokal server).\n\n' +
               `Fejl: ${String(err?.message || err)}`
             );
           }
         });
       });
+
+      updateSummaries();
     }
 
-    // --------- Add: add + geocode + draw immediately ---------
+    // ----------------- Add handler -----------------
     async function addEntry() {
       const btn = document.getElementById('add');
       btn.disabled = true;
@@ -684,32 +846,30 @@
         return;
       }
 
-      const e = { id: uuid(), kreds, name, address, color, radius, marker: null, isEditing: false };
+      const e = { id: uuid(), kreds, name, address, color, radius, lat: undefined, lng: undefined };
       entries.push(e);
-      renderTable();
+      renderKredsLists();
       setStatus('');
 
       try {
-        const r = await geocodeAndPlaceOrMoveMarker(e, { flyTo: true });
-        if (!r.ok) {
-          const idx = entries.findIndex(x => x.id === e.id);
-          if (idx >= 0) entries.splice(idx, 1);
-          renderTable();
-          setStatus('Ingen match på adressen. Prøv med postnr/by.');
-          btn.disabled = false;
-          return;
-        }
+        const r = await geocodeAndSetCoords(e, { flyTo: true });
+        if (!r.ok) throw new Error("Ingen match");
 
-        // behold kreds-valg, men ryd navn/adresse
+        // clear name/address, keep kreds
         document.getElementById('name').value = '';
         document.getElementById('address').value = '';
         document.getElementById('address').focus();
 
+        saveState();
+        renderKredsLists();
+        updateVisibility();
         setStatus('');
       } catch (err) {
+        // remove entry on failure
         const idx = entries.findIndex(x => x.id === e.id);
         if (idx >= 0) entries.splice(idx, 1);
-        renderTable();
+        renderKredsLists();
+        updateVisibility();
 
         setStatus(
           'Kunne ikke hente koordinater.\n' +
@@ -721,16 +881,19 @@
       }
     }
 
-    // --------- Bulk edit ---------
+    // ----------------- Bulk handlers -----------------
     function applyBulkRadius() {
       const r = clampRadius(document.getElementById('bulkRadiusNumber').value);
       if (entries.length === 0) { setStatus('Der er ingen punkter at opdatere.'); return; }
 
       for (const e of entries) {
         e.radius = r;
+        ensureMarker(e);
         updateMarkerStyleAndPopup(e);
       }
-      renderTable();
+      saveState();
+      renderKredsLists();
+      updateVisibility();
       setStatus('');
     }
 
@@ -740,121 +903,66 @@
 
       for (const e of entries) {
         e.color = c;
+        ensureMarker(e);
         updateMarkerStyleAndPopup(e);
       }
-      renderTable();
+      saveState();
+      renderKredsLists();
       updateVisibility();
       setStatus('');
     }
 
-    // --------- Filtre UI ---------
-    function renderKredsFilters() {
-      const container = document.getElementById('kredsFilters');
-      container.innerHTML = '';
-      for (let k=1;k<=9;k++) {
-        const id = `kreds_${k}`;
-        const div = document.createElement('label');
-        div.className = 'filterItem';
-        div.innerHTML = `
-          <input type="checkbox" id="${id}" ${selectedKredse.has(k) ? 'checked' : ''}/>
-          <span>${k}</span>
-        `;
-        container.appendChild(div);
+    // ----------------- Opacity sync -----------------
+    const opacityRange = document.getElementById('opacityRange');
+    const opacityNumber = document.getElementById('opacityNumber');
 
-        div.querySelector('input').addEventListener('change', (ev) => {
-          if (ev.target.checked) selectedKredse.add(k);
-          else selectedKredse.delete(k);
-          updateVisibility();
-        });
-      }
+    function syncOpacityFrom(source) {
+      currentOpacity = clampOpacity(source.value);
+      opacityRange.value = String(currentOpacity);
+      opacityNumber.value = String(currentOpacity);
+      updateAllMarkersOpacity();
+      saveState();
+      setStatus('');
     }
 
-    function renderColorFilters() {
-      const container = document.getElementById('colorFilters');
-      container.innerHTML = '';
-      for (const c of COLOR_PRESETS) {
-        const id = `color_${btoa(c.value).replace(/=/g,'')}`;
-        const div = document.createElement('label');
-        div.className = 'filterItem';
-        div.innerHTML = `
-          <input type="checkbox" id="${id}" ${selectedColors.has(c.value) ? 'checked' : ''}/>
-          <span class="swatch" style="background:${c.value}"></span>
-          <span>${c.label}</span>
-        `;
-        container.appendChild(div);
-
-        div.querySelector('input').addEventListener('change', (ev) => {
-          if (ev.target.checked) selectedColors.add(c.value);
-          else selectedColors.delete(c.value);
-          updateVisibility();
-        });
-      }
-    }
-
-    function setAllKredse(on) {
-      selectedKredse.clear();
-      if (on) for (let k=1;k<=9;k++) selectedKredse.add(k);
-      renderKredsFilters();
-      updateVisibility();
-    }
-
-    function setAllColors(on) {
-      selectedColors.clear();
-      if (on) for (const c of COLOR_PRESETS) selectedColors.add(c.value);
-      renderColorFilters();
-      updateVisibility();
-    }
-
-    // --------- Init ---------
+    // ----------------- Init -----------------
     populateKredsSelect(document.getElementById('kreds'));
     populateColorSelect(document.getElementById('color'), COLOR_PRESETS[0].value);
     populateColorSelect(document.getElementById('bulkColor'), COLOR_PRESETS[0].value);
 
-    // Add form size sync (slider + number + preview)
-    const radiusRange = document.getElementById('radiusRange');
-    const radiusNumber = document.getElementById('radiusNumber');
-    const addPreviewDot = document.getElementById('addPreviewDot');
-    const colorSelect = document.getElementById('color');
+    // load persisted state
+    loadState();
 
-    function syncAddSizeFrom(source) {
-      const v = clampRadius(source.value);
-      radiusRange.value = String(v);
-      radiusNumber.value = String(v);
-      setPreviewDot(addPreviewDot, v, colorSelect.value);
+    // apply loaded opacity to UI
+    opacityRange.value = String(currentOpacity);
+    opacityNumber.value = String(currentOpacity);
+
+    // create markers for loaded entries
+    for (const e of entries) {
+      ensureMarker(e);
+      updateMarkerStyleAndPopup(e);
     }
-    radiusRange.addEventListener('input', () => syncAddSizeFrom(radiusRange));
-    radiusNumber.addEventListener('input', () => syncAddSizeFrom(radiusNumber));
-    colorSelect.addEventListener('change', () => setPreviewDot(addPreviewDot, clampRadius(radiusNumber.value), colorSelect.value));
-    syncAddSizeFrom(radiusNumber);
 
-    // Bulk size sync
-    const bulkRange = document.getElementById('bulkRadiusRange');
-    const bulkNumber = document.getElementById('bulkRadiusNumber');
-    const bulkPreviewDot = document.getElementById('bulkPreviewDot');
-    const bulkColorSelect = document.getElementById('bulkColor');
+    // render filters + lists
+    renderKredsFilters();
+    renderColorFilters();
+    renderKredsLists();
+    updateVisibility();
+    updateSummaries();
 
-    function syncBulkSizeFrom(source) {
-      const v = clampRadius(source.value);
-      bulkRange.value = String(v);
-      bulkNumber.value = String(v);
-      setPreviewDot(bulkPreviewDot, v, bulkColorSelect.value);
-    }
-    bulkRange.addEventListener('input', () => syncBulkSizeFrom(bulkRange));
-    bulkNumber.addEventListener('input', () => syncBulkSizeFrom(bulkNumber));
-    bulkColorSelect.addEventListener('change', () => setPreviewDot(bulkPreviewDot, clampRadius(bulkNumber.value), bulkColorSelect.value));
-    syncBulkSizeFrom(bulkNumber);
-
-    // Bind buttons
+    // bind
     document.getElementById('add').addEventListener('click', addEntry);
     document.getElementById('applyBulkRadius').addEventListener('click', applyBulkRadius);
     document.getElementById('applyBulkColor').addEventListener('click', applyBulkColor);
 
-    document.getElementById('kredsAll').addEventListener('click', () => setAllKredse(true));
-    document.getElementById('kredsNone').addEventListener('click', () => setAllKredse(false));
-    document.getElementById('colorAll').addEventListener('click', () => setAllColors(true));
-    document.getElementById('colorNone').addEventListener('click', () => setAllColors(false));
+    document.getElementById('kredsAll').addEventListener('click', () => { setAllKredse(true); saveState(); });
+    document.getElementById('kredsNone').addEventListener('click', () => { setAllKredse(false); saveState(); });
+    document.getElementById('colorAll').addEventListener('click', () => { setAllColors(true); saveState(); });
+    document.getElementById('colorNone').addEventListener('click', () => { setAllColors(false); saveState(); });
 
-    // Enter i adressefelt = tilføj
+    opacityRange.addEventListener('input', () => syncOpacityFrom(opacityRange));
+    opacityNumber.addEventListener('input', () => syncOpacityFrom(opacityNumber));
+
     document.getElementById('address').addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
         e.preventDefault();
@@ -862,11 +970,30 @@
       }
     });
 
-    // Render filters
-    renderKredsFilters();
-    renderColorFilters();
+    document.getElementById('clearAllStorage').addEventListener('click', () => {
+      if (!confirm("Vil du slette alle gemte valgsteder?")) return;
+      clearStorage();
 
-    renderTable();
+      // clear runtime
+      for (const m of markerById.values()) {
+        if (markerGroup.hasLayer(m)) markerGroup.removeLayer(m);
+        m.remove();
+      }
+      markerById.clear();
+      entries.splice(0, entries.length);
+      editingIds.clear();
+      backups.clear();
+
+      // reset filters (optional)
+      selectedKredse.clear(); for (let k=1;k<=9;k++) selectedKredse.add(k);
+      selectedColors.clear(); for (const c of COLOR_PRESETS) selectedColors.add(c.value);
+
+      renderKredsFilters();
+      renderColorFilters();
+      renderKredsLists();
+      updateVisibility();
+      setStatus('');
+    });
   </script>
 </body>
 </html>
