@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Navn + adresse → Cirkler på kort (København)</title>
+  <title>Tilføj valgsteder</title>
 
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 
@@ -35,7 +35,6 @@
     .hint { font-size: 12px; color:#666; margin-top: 8px; line-height: 1.35; }
     #map { height: 100vh; }
 
-    .row3 { display: grid; grid-template-columns: 1.2fr 1fr 0.8fr; gap: 10px; }
     .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 
     .list { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 10px; }
@@ -51,7 +50,8 @@
       white-space: nowrap;
     }
     .swatch { width: 10px; height: 10px; border-radius: 50%; border: 1px solid #0002; display:inline-block; }
-    .actions { display:flex; gap:6px; flex-wrap: wrap; }
+
+    .actions { display:flex; gap:6px; flex-wrap: nowrap; }
     .mini {
       padding: 6px 8px;
       border-radius: 10px;
@@ -61,6 +61,7 @@
       font-size: 12px;
       width: auto;
       margin-top: 0;
+      white-space: nowrap;
     }
     .mini.primary { background:#111; color:#fff; border-color:#111; }
 
@@ -73,70 +74,60 @@
     /* slider + preview */
     .sliderRow {
       display: grid;
-      grid-template-columns: 1fr auto;
+      grid-template-columns: 1fr 78px auto;
       align-items: center;
       gap: 10px;
     }
     input[type="range"] { width: 100%; }
     .previewDot {
-      width: 24px;
-      height: 24px;
       border-radius: 50%;
       border: 1px solid #0002;
       background: #111;
       display: inline-block;
       flex: none;
+      width: 24px;
+      height: 24px;
     }
 
-    .bulk {
-      margin-top: 12px;
-      border-top: 1px solid var(--border);
-      padding-top: 10px;
-    }
+    .bulk { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 10px; }
     .bulk h3 { font-size: 13px; margin: 0 0 8px; }
     .bulk .mini { margin-top: 8px; }
 
     /* small select/inputs inside table edit mode */
     .inlineInput { width: 100%; padding: 6px; border: 1px solid var(--border); border-radius: 10px; box-sizing: border-box; font-size: 12px; }
     .inlineSelect { width: 100%; padding: 6px; border: 1px solid var(--border); border-radius: 10px; box-sizing: border-box; font-size: 12px; background: #fff; }
+    .inlineNumber { width: 100%; padding: 6px; border: 1px solid var(--border); border-radius: 10px; box-sizing: border-box; font-size: 12px; }
   </style>
 </head>
 
 <body>
   <div class="wrap">
     <div class="panel">
-      <h2>Tilføj punkter</h2>
+      <h2>Tilføj valgsteder</h2>
 
       <label for="name">Navn</label>
-      <input id="name" type="text" placeholder="Fx 'Kunde A' eller 'Lokation 1'"/>
+      <input id="name" type="text" placeholder="Fx 'Valgsted 1'"/>
 
       <label for="address">Adresse</label>
       <input id="address" type="text" placeholder="Fx 'Rådhuspladsen 1, 1550 København'"/>
 
-      <div class="row3">
+      <div class="row2">
         <div>
           <label for="color">Farve</label>
           <select id="color"></select>
         </div>
 
         <div>
-          <label for="radiusRange">Størrelse (px)</label>
+          <label>Størrelse (px)</label>
           <div class="sliderRow">
             <input id="radiusRange" type="range" min="2" max="50" value="12" />
+            <input id="radiusNumber" type="number" min="2" max="50" value="12" />
             <span id="addPreviewDot" class="previewDot" title="Preview"></span>
           </div>
-          <div class="hint">Valgt: <span id="radiusValue">12</span> px</div>
-        </div>
-
-        <div style="display:flex; align-items:end;">
-          <button id="add" class="primary" style="margin-top:0;">Tilføj</button>
         </div>
       </div>
 
-      <label style="display:flex; align-items:center; gap:8px; margin-top: 12px;">
-        <input id="limitToCph" type="checkbox" checked />
-        Begræns til Københavns kommune (0101)
-      </label>
+      <button id="add" class="primary">Tilføj</button>
 
       <div id="status" class="status"></div>
 
@@ -145,12 +136,12 @@
 
         <div class="row2">
           <div>
-            <label for="bulkRadiusRange">Sæt størrelse for alle (px)</label>
+            <label>Sæt størrelse for alle (px)</label>
             <div class="sliderRow">
               <input id="bulkRadiusRange" type="range" min="2" max="50" value="12" />
+              <input id="bulkRadiusNumber" type="number" min="2" max="50" value="12" />
               <span id="bulkPreviewDot" class="previewDot" title="Preview"></span>
             </div>
-            <div class="hint">Valgt: <span id="bulkRadiusValue">12</span> px</div>
             <button id="applyBulkRadius" class="mini primary">Anvend størrelse til alle</button>
           </div>
 
@@ -158,14 +149,13 @@
             <label for="bulkColor">Sæt farve for alle</label>
             <select id="bulkColor"></select>
             <button id="applyBulkColor" class="mini">Anvend farve til alle</button>
-            <div class="hint">Tip: Du kan også redigere enkeltvis i listen.</div>
           </div>
         </div>
       </div>
 
       <div class="list">
         <h3>Liste</h3>
-        <div class="hint">Punkter geokodes og tegnes med det samme, når du trykker “Tilføj”.</div>
+        <div class="hint">Du kan tilføje op til ca. 100 ad gangen.</div>
 
         <table>
           <thead>
@@ -195,8 +185,11 @@
 
   <script>
     // --------- Konfiguration ---------
-    const FIXED_FILL_OPACITY = 0.55; // fast (ingen UI-kontrol)
-    const PER_REQUEST_DELAY_MS = 80; // lille pause for at være “pæn”
+    const FIXED_FILL_OPACITY = 0.55;
+    const PER_REQUEST_DELAY_MS = 80;
+
+    // (UI er fjernet, men vi begrænser stadig til Københavns kommune i baggrunden)
+    const LIMIT_TO_CPH = true;
 
     const COLOR_PRESETS = [
       { label: "Rød",   value: "#e11d48" },
@@ -209,14 +202,13 @@
     ];
 
     // --------- Kort ---------
-    const map = L.map('map').setView([55.6761, 12.5683], 12); // København
+    const map = L.map('map').setView([55.6761, 12.5683], 12);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
       attribution: '&copy; OpenStreetMap'
     }).addTo(map);
 
-    // Layer pr. farve (nem legend/filter)
-    const layersByColor = new Map(); // color -> L.LayerGroup
+    const layersByColor = new Map();
     function getLayer(color) {
       if (!layersByColor.has(color)) layersByColor.set(color, L.layerGroup().addTo(map));
       return layersByColor.get(color);
@@ -248,6 +240,12 @@
       return (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random());
     }
 
+    function clampRadius(v) {
+      const n = Number(v);
+      if (!Number.isFinite(n)) return 12;
+      return Math.max(2, Math.min(50, Math.round(n)));
+    }
+
     function populateColorSelect(selectEl, defaultValue) {
       selectEl.innerHTML = '';
       for (const c of COLOR_PRESETS) {
@@ -260,20 +258,20 @@
     }
 
     function setPreviewDot(dotEl, radius, color) {
-      const r = Math.max(2, Math.min(50, Number(radius) || 12));
+      const r = clampRadius(radius);
       dotEl.style.width = (r * 2) + 'px';
       dotEl.style.height = (r * 2) + 'px';
       dotEl.style.background = color || '#111';
     }
 
     // --------- DAWA geokodning ---------
-    async function geocodeDAWA(address, limitToCph) {
+    async function geocodeDAWA(address) {
       const params = new URLSearchParams();
       params.set('q', address);
       params.set('format', 'geojson');
       params.set('struktur', 'mini');
       params.set('srid', '4326');
-      if (limitToCph) params.set('kommunekode', '0101');
+      if (LIMIT_TO_CPH) params.set('kommunekode', '0101');
 
       const urls = [
         `https://api.dataforsyningen.dk/adresser?${params.toString()}`,
@@ -302,22 +300,18 @@
         <div style="line-height:1.3">
           <b>${escapeHtml(e.name || '(uden navn)')}</b><br/>
           ${escapeHtml(e.address)}<br/>
-          <span style="color:#666">${escapeHtml(e.color)}, ${escapeHtml(e.radius)}px</span>
+          <span style="color:#666">${escapeHtml(e.radius)}px</span>
         </div>
       `;
     }
 
     function ensureMarkerInCorrectLayer(e, oldColor) {
       if (!e.marker) return;
-
-      // Hvis farven ikke har ændret sig, er der intet at flytte
       if (!oldColor || oldColor === e.color) return;
 
-      // Fjern fra gammel layer ved at remove() og addTo() igen
       e.marker.remove();
       const newLayer = getLayer(e.color);
       e.marker.addTo(newLayer);
-
       removeEmptyLayers();
     }
 
@@ -335,11 +329,9 @@
     }
 
     async function geocodeAndPlaceOrMoveMarker(e, { flyTo = true } = {}) {
-      const limitToCph = document.getElementById('limitToCph').checked;
-
       await new Promise(r => setTimeout(r, PER_REQUEST_DELAY_MS));
 
-      const g = await geocodeDAWA(e.address, limitToCph);
+      const g = await geocodeDAWA(e.address);
       if (!g) return { ok: false, error: 'Ingen match' };
 
       e.lat = g.lat;
@@ -441,9 +433,9 @@
             </td>
           `;
         } else {
-          // Edit mode: inputs + slider preview
           const colorSelectId = `editColor_${e.id}`;
-          const radiusId = `editRadius_${e.id}`;
+          const radiusRangeId = `editRadiusRange_${e.id}`;
+          const radiusNumberId = `editRadiusNumber_${e.id}`;
           const previewId = `editPreview_${e.id}`;
 
           tr.innerHTML = `
@@ -458,10 +450,10 @@
                 <select class="inlineSelect" id="${colorSelectId}" data-color="${e.id}"></select>
 
                 <div class="sliderRow">
-                  <input id="${radiusId}" type="range" min="2" max="50" value="${escapeHtml(e.radius)}" data-radius="${e.id}"/>
+                  <input id="${radiusRangeId}" type="range" min="2" max="50" value="${escapeHtml(e.radius)}" data-radiusrange="${e.id}"/>
+                  <input id="${radiusNumberId}" class="inlineNumber" type="number" min="2" max="50" value="${escapeHtml(e.radius)}" data-radiusnumber="${e.id}"/>
                   <span id="${previewId}" class="previewDot"></span>
                 </div>
-                <div class="hint">Valgt: <span data-radiusval="${e.id}">${escapeHtml(e.radius)}</span> px</div>
               </div>
             </td>
             <td>
@@ -475,29 +467,34 @@
 
         tbody.appendChild(tr);
 
-        // If edit mode, populate select + preview after row is in DOM
+        // Edit mode wiring
         if (e.isEditing) {
           const sel = tr.querySelector(`select[data-color="${CSS.escape(e.id)}"]`) || document.getElementById(`editColor_${e.id}`);
           if (sel) populateColorSelect(sel, e.color);
 
-          const radiusEl = document.getElementById(`editRadius_${e.id}`);
+          const rangeEl = document.getElementById(`editRadiusRange_${e.id}`);
+          const numberEl = document.getElementById(`editRadiusNumber_${e.id}`);
           const previewEl = document.getElementById(`editPreview_${e.id}`);
-          if (radiusEl && previewEl) {
-            setPreviewDot(previewEl, radiusEl.value, sel ? sel.value : e.color);
-            radiusEl.addEventListener('input', () => {
-              const v = Number(radiusEl.value);
-              const label = tr.querySelector(`[data-radiusval="${CSS.escape(e.id)}"]`);
-              if (label) label.textContent = String(v);
+
+          if (rangeEl && numberEl && previewEl) {
+            const sync = (source) => {
+              const v = clampRadius(source.value);
+              rangeEl.value = String(v);
+              numberEl.value = String(v);
               setPreviewDot(previewEl, v, sel ? sel.value : e.color);
-            });
-            if (sel) {
-              sel.addEventListener('change', () => setPreviewDot(previewEl, radiusEl.value, sel.value));
-            }
+            };
+
+            // init
+            sync(rangeEl);
+
+            rangeEl.addEventListener('input', () => sync(rangeEl));
+            numberEl.addEventListener('input', () => sync(numberEl));
+            if (sel) sel.addEventListener('change', () => setPreviewDot(previewEl, clampRadius(rangeEl.value), sel.value));
           }
         }
       }
 
-      // bind actions
+      // bind delete
       tbody.querySelectorAll('button[data-del]').forEach(btn => {
         btn.addEventListener('click', () => {
           const id = btn.getAttribute('data-del');
@@ -511,23 +508,26 @@
           removeEmptyLayers();
           renderTable();
           buildLegend();
+          setStatus('');
         });
       });
 
+      // bind edit
       tbody.querySelectorAll('button[data-edit]').forEach(btn => {
         btn.addEventListener('click', () => {
           const id = btn.getAttribute('data-edit');
           const e = entries.find(x => x.id === id);
           if (!e) return;
 
-          // gem en “snapshot” så Fortryd virker
           e._backup = { name: e.name, address: e.address, color: e.color, radius: e.radius };
           e.isEditing = true;
 
           renderTable();
+          setStatus('');
         });
       });
 
+      // cancel
       tbody.querySelectorAll('button[data-cancel]').forEach(btn => {
         btn.addEventListener('click', () => {
           const id = btn.getAttribute('data-cancel');
@@ -544,25 +544,27 @@
           e.isEditing = false;
 
           renderTable();
+          setStatus('');
         });
       });
 
+      // save
       tbody.querySelectorAll('button[data-save]').forEach(btn => {
         btn.addEventListener('click', async () => {
           const id = btn.getAttribute('data-save');
           const e = entries.find(x => x.id === id);
           if (!e) return;
 
-          // læs inputs
           const nameInput = tbody.querySelector(`input[data-name="${CSS.escape(id)}"]`);
           const addrInput = tbody.querySelector(`input[data-address="${CSS.escape(id)}"]`);
           const colorSel  = tbody.querySelector(`select[data-color="${CSS.escape(id)}"]`);
-          const radiusEl  = tbody.querySelector(`input[data-radius="${CSS.escape(id)}"]`);
+          const rangeEl   = tbody.querySelector(`input[data-radiusrange="${CSS.escape(id)}"]`);
+          const numberEl  = tbody.querySelector(`input[data-radiusnumber="${CSS.escape(id)}"]`);
 
           const newName = (nameInput?.value ?? '').trim();
           const newAddress = (addrInput?.value ?? '').trim();
           const newColor = (colorSel?.value ?? e.color);
-          const newRadius = Math.max(2, Math.min(50, Number(radiusEl?.value ?? e.radius)));
+          const newRadius = clampRadius((numberEl?.value ?? rangeEl?.value ?? e.radius));
 
           if (!newAddress) { setStatus('Adresse må ikke være tom.'); return; }
 
@@ -574,26 +576,21 @@
           e.color = newColor;
           e.radius = newRadius;
 
-          setStatus('Gemmer ændringer…');
-
           try {
-            // Flyt marker til nyt farvelag hvis nødvendigt
             ensureMarkerInCorrectLayer(e, oldColor);
 
-            // Hvis adressen ændres, re-geocode og flyt markør
             if (newAddress !== oldAddress) {
               const r = await geocodeAndPlaceOrMoveMarker(e, { flyTo: true });
               if (!r.ok) {
-                // hvis geokodning fejler, rul tilbage til backup
                 if (e._backup) {
                   e.name = e._backup.name;
                   e.address = e._backup.address;
                   e.color = e._backup.color;
                   e.radius = e._backup.radius;
-                  ensureMarkerInCorrectLayer(e, newColor); // flyt evt tilbage
+                  ensureMarkerInCorrectLayer(e, newColor);
                   updateMarkerStyleAndPopup(e);
                 }
-                setStatus('Kunne ikke finde adressen (ingen match). Ændringer blev ikke gemt.');
+                setStatus('Kunne ikke finde adressen (ingen match).');
                 e.isEditing = false;
                 delete e._backup;
                 renderTable();
@@ -601,7 +598,6 @@
                 return;
               }
             } else {
-              // ellers kun stil/popup-opdatering
               updateMarkerStyleAndPopup(e);
             }
 
@@ -610,9 +606,8 @@
 
             renderTable();
             buildLegend();
-            setStatus('Opdateret ✅');
+            setStatus('');
           } catch (err) {
-            // rollback ved fejl
             if (e._backup) {
               const wasColor = e.color;
               e.name = e._backup.name;
@@ -628,7 +623,8 @@
             buildLegend();
 
             setStatus(
-              'Kunne ikke opdatere (typisk pga. net/CORS ved file://).\n' +
+              'Kunne ikke opdatere.\n' +
+              'Hvis du åbner som file://, så prøv via http://localhost (lokal server).\n\n' +
               `Fejl: ${String(err?.message || err)}`
             );
           }
@@ -636,7 +632,7 @@
       });
     }
 
-    // --------- Add handler: add + geocode + draw immediately ---------
+    // --------- Add: add + geocode + draw immediately ---------
     async function addEntry() {
       const btn = document.getElementById('add');
       btn.disabled = true;
@@ -644,7 +640,7 @@
       const name = document.getElementById('name').value.trim();
       const address = document.getElementById('address').value.trim();
       const color = document.getElementById('color').value;
-      const radius = Math.max(2, Math.min(50, Number(document.getElementById('radiusRange').value || 12)));
+      const radius = clampRadius(document.getElementById('radiusNumber').value);
 
       if (!address) {
         setStatus('Skriv en adresse før du tilføjer.');
@@ -652,7 +648,7 @@
         return;
       }
       if (entries.length >= 100) {
-        setStatus('Du har allerede 100 punkter i listen. Slet nogle før du tilføjer flere.');
+        setStatus('Du har allerede 100 punkter i listen.');
         btn.disabled = false;
         return;
       }
@@ -660,28 +656,26 @@
       const e = { id: uuid(), name, address, color, radius, marker: null, isEditing: false };
       entries.push(e);
       renderTable();
-      setStatus('Geokoder og tilføjer på kort…');
+      setStatus('');
 
       try {
         const r = await geocodeAndPlaceOrMoveMarker(e, { flyTo: true });
         if (!r.ok) {
-          // fjern entry igen hvis ingen match (så listen ikke fyldes med “døde” rækker)
           const idx = entries.findIndex(x => x.id === e.id);
           if (idx >= 0) entries.splice(idx, 1);
           renderTable();
-          setStatus('Ingen match på adressen. Prøv at tilføje postnr/by eller slå kommune-begrænsning fra.');
+          setStatus('Ingen match på adressen. Prøv med postnr/by.');
           btn.disabled = false;
           return;
         }
 
         buildLegend();
-        setStatus('Tilføjet ✅');
+        setStatus('');
 
         document.getElementById('name').value = '';
         document.getElementById('address').value = '';
         document.getElementById('address').focus();
       } catch (err) {
-        // fjern entry igen ved fejl
         const idx = entries.findIndex(x => x.id === e.id);
         if (idx >= 0) entries.splice(idx, 1);
         renderTable();
@@ -696,9 +690,9 @@
       }
     }
 
-    // --------- Bulk edit handlers ---------
+    // --------- Bulk edit ---------
     function applyBulkRadius() {
-      const r = Math.max(2, Math.min(50, Number(document.getElementById('bulkRadiusRange').value || 12)));
+      const r = clampRadius(document.getElementById('bulkRadiusNumber').value);
       if (entries.length === 0) { setStatus('Der er ingen punkter at opdatere.'); return; }
 
       for (const e of entries) {
@@ -706,7 +700,7 @@
         updateMarkerStyleAndPopup(e);
       }
       renderTable();
-      setStatus(`Opdaterede størrelse til ${r}px for alle ✅`);
+      setStatus('');
     }
 
     function applyBulkColor() {
@@ -722,41 +716,46 @@
       removeEmptyLayers();
       buildLegend();
       renderTable();
-      setStatus('Opdaterede farve for alle ✅');
+      setStatus('');
     }
 
     // --------- Init ---------
-    // populate selects
     populateColorSelect(document.getElementById('color'), COLOR_PRESETS[0].value);
     populateColorSelect(document.getElementById('bulkColor'), COLOR_PRESETS[0].value);
 
-    // add slider preview (add form)
+    // Add form size controls sync
     const radiusRange = document.getElementById('radiusRange');
-    const radiusValue = document.getElementById('radiusValue');
+    const radiusNumber = document.getElementById('radiusNumber');
     const addPreviewDot = document.getElementById('addPreviewDot');
     const colorSelect = document.getElementById('color');
 
-    function syncAddPreview() {
-      radiusValue.textContent = String(radiusRange.value);
-      setPreviewDot(addPreviewDot, radiusRange.value, colorSelect.value);
+    function syncAddSizeFrom(valueSource) {
+      const v = clampRadius(valueSource.value);
+      radiusRange.value = String(v);
+      radiusNumber.value = String(v);
+      setPreviewDot(addPreviewDot, v, colorSelect.value);
     }
-    radiusRange.addEventListener('input', syncAddPreview);
-    colorSelect.addEventListener('change', syncAddPreview);
-    syncAddPreview();
+    radiusRange.addEventListener('input', () => syncAddSizeFrom(radiusRange));
+    radiusNumber.addEventListener('input', () => syncAddSizeFrom(radiusNumber));
+    colorSelect.addEventListener('change', () => setPreviewDot(addPreviewDot, clampRadius(radiusNumber.value), colorSelect.value));
+    syncAddSizeFrom(radiusNumber);
 
-    // bulk slider preview
+    // Bulk size controls sync
     const bulkRange = document.getElementById('bulkRadiusRange');
-    const bulkValue = document.getElementById('bulkRadiusValue');
+    const bulkNumber = document.getElementById('bulkRadiusNumber');
     const bulkPreviewDot = document.getElementById('bulkPreviewDot');
     const bulkColorSelect = document.getElementById('bulkColor');
 
-    function syncBulkPreview() {
-      bulkValue.textContent = String(bulkRange.value);
-      setPreviewDot(bulkPreviewDot, bulkRange.value, bulkColorSelect.value);
+    function syncBulkSizeFrom(valueSource) {
+      const v = clampRadius(valueSource.value);
+      bulkRange.value = String(v);
+      bulkNumber.value = String(v);
+      setPreviewDot(bulkPreviewDot, v, bulkColorSelect.value);
     }
-    bulkRange.addEventListener('input', syncBulkPreview);
-    bulkColorSelect.addEventListener('change', syncBulkPreview);
-    syncBulkPreview();
+    bulkRange.addEventListener('input', () => syncBulkSizeFrom(bulkRange));
+    bulkNumber.addEventListener('input', () => syncBulkSizeFrom(bulkNumber));
+    bulkColorSelect.addEventListener('change', () => setPreviewDot(bulkPreviewDot, clampRadius(bulkNumber.value), bulkColorSelect.value));
+    syncBulkSizeFrom(bulkNumber);
 
     // bind buttons
     document.getElementById('add').addEventListener('click', addEntry);
