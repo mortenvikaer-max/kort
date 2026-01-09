@@ -8,10 +8,20 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 
   <style>
-    :root { --border:#e8e8e8; }
+    :root { --border:#e8e8e8; --sidebar: 420px; }
     body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 0; }
-    .wrap { display: grid; grid-template-columns: 420px 1fr; height: 100vh; }
-    .panel { padding: 14px; border-right: 1px solid var(--border); overflow: auto; }
+
+    /* Resizable layout: panel | resizer | map */
+    .wrap { display: grid; grid-template-columns: var(--sidebar) 10px 1fr; height: 100vh; }
+    .panel { padding: 14px; border-right: 1px solid var(--border); overflow: auto; overflow-x: hidden; }
+    .resizer {
+      cursor: col-resize;
+      background: linear-gradient(to right, #0000, #0001, #0000);
+      border-right: 1px solid var(--border);
+      border-left: 1px solid var(--border);
+    }
+    .resizer:hover { background: linear-gradient(to right, #0000, #0002, #0000); }
+
     h2 { font-size: 16px; margin: 0 0 12px; }
     label { display: block; font-size: 12px; color:#444; margin-top: 10px; }
 
@@ -31,6 +41,7 @@
       border-radius: 12px;
       cursor: pointer;
       margin-top: 10px;
+      box-sizing: border-box;
     }
     button.primary { background: #111; color: #fff; border-color:#111; }
     button:disabled { opacity: .6; cursor: not-allowed; }
@@ -39,11 +50,15 @@
     #map { height: 100vh; }
 
     .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-
     .status { margin-top: 10px; font-size: 12px; color:#333; white-space: pre-wrap; }
 
-    table { width: 100%; border-collapse: collapse; }
-    th, td { text-align: left; font-size: 12px; padding: 8px 6px; border-bottom: 1px solid #f0f0f0; vertical-align: top; }
+    /* Prevent overflow: fixed table layout + wrapping */
+    table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+    th, td {
+      text-align: left; font-size: 12px; padding: 8px 6px;
+      border-bottom: 1px solid #f0f0f0; vertical-align: top;
+      overflow-wrap: anywhere;
+    }
     th { color:#666; font-weight: 600; }
 
     .pill {
@@ -51,10 +66,12 @@
       padding: 3px 8px; border: 1px solid #0001; border-radius: 999px;
       background: #fff;
       white-space: nowrap;
+      max-width: 100%;
     }
-    .swatch { width: 10px; height: 10px; border-radius: 50%; border: 1px solid #0002; display:inline-block; }
+    .swatch { width: 10px; height: 10px; border-radius: 50%; border: 1px solid #0002; display:inline-block; flex: none; }
 
-    .actions { display:flex; gap:6px; flex-wrap: nowrap; align-items:center; }
+    /* IMPORTANT: allow wrapping so "Redigér/Slet" never runs outside */
+    .actions { display:flex; gap:6px; flex-wrap: wrap; align-items:center; }
     .mini {
       padding: 6px 8px;
       border-radius: 10px;
@@ -65,6 +82,8 @@
       width: auto;
       margin-top: 0;
       white-space: nowrap;
+      max-width: 100%;
+      box-sizing: border-box;
     }
     .mini.primary { background:#111; color:#fff; border-color:#111; }
 
@@ -91,7 +110,7 @@
     summary::-webkit-details-marker { display: none; }
     .summaryRight { font-size: 12px; color:#666; font-weight: 500; }
 
-    .filterBtns { display:flex; gap:6px; margin-top: 8px; }
+    .filterBtns { display:flex; gap:6px; margin-top: 8px; flex-wrap: wrap; }
     .filterGrid { display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 10px; margin-top: 10px; }
     .filterItem { display:flex; align-items:center; gap:8px; font-size:12px; }
     .filterItem input { transform: translateY(1px); }
@@ -133,7 +152,7 @@
         </div>
       </div>
 
-      <button id="add" class="primary">Tilføj</button>
+      <button id="add" class="primary" type="button">Tilføj</button>
 
       <div id="status" class="status"></div>
 
@@ -150,8 +169,8 @@
               <span class="summaryRight" id="kredsSummary"></span>
             </summary>
             <div class="filterBtns">
-              <button class="mini" id="kredsAll">Vælg alle</button>
-              <button class="mini" id="kredsNone">Fjern alle</button>
+              <button class="mini" id="kredsAll" type="button">Vælg alle</button>
+              <button class="mini" id="kredsNone" type="button">Fjern alle</button>
             </div>
             <div class="filterGrid" id="kredsFilters"></div>
           </details>
@@ -172,37 +191,43 @@
         <details>
           <summary>
             Ændringer for alle valgsteder
-            <span class="summaryRight"></span>
+            <span class="summaryRight" id="bulkSummary"></span>
           </summary>
+
+          <!-- NYT: segmentering efter farve -->
+          <label for="bulkTargetColor" style="margin-top:10px;">Gælder for (farve)</label>
+          <select id="bulkTargetColor"></select>
+          <div class="hint" id="bulkTargetHint"></div>
 
           <div class="row2" style="margin-top:10px;">
             <div>
-              <label for="bulkRadiusNumber">Sæt størrelse for alle (px) (max 20)</label>
+              <label for="bulkRadiusNumber">Sæt størrelse (px) (max 20)</label>
               <input id="bulkRadiusNumber" type="number" min="2" max="20" value="12" />
-              <button id="applyBulkRadius" class="mini primary" style="margin-top:8px;">Anvend størrelse til alle</button>
+              <button id="applyBulkRadius" class="mini primary" type="button" style="margin-top:8px;">Anvend størrelse</button>
             </div>
 
             <div>
-              <label for="bulkColor">Sæt farve for alle</label>
+              <label for="bulkColor">Skift farve til</label>
               <select id="bulkColor"></select>
-              <button id="applyBulkColor" class="mini" style="margin-top:8px;">Anvend farve til alle</button>
+              <button id="applyBulkColor" class="mini" type="button" style="margin-top:8px;">Anvend farveskift</button>
             </div>
           </div>
 
-          <label for="bulkOpacityNumber" style="margin-top:12px;">Opacity for alle cirkler (0–1)</label>
+          <label for="bulkOpacityNumber" style="margin-top:12px;">Opacity (0–1)</label>
           <div class="controlsRow">
             <input id="bulkOpacityRange" type="range" min="0" max="1" step="0.05" value="0.55" />
             <input id="bulkOpacityNumber" type="number" min="0" max="1" step="0.05" value="0.55" />
           </div>
-          <div class="hint">Opacity gemmes automatisk.</div>
+          <div class="hint">Opacity gemmes automatisk. (Gælder for den valgte farve – eller alle farver).</div>
 
-          <button id="clearAllStorage" class="mini" style="margin-top:12px;">Slet alle gemte valgsteder</button>
+          <button id="clearAllStorage" class="mini" type="button" style="margin-top:12px;">Slet alle gemte valgsteder</button>
           <div class="hint">Dette fjerner alt gemt i browseren (localStorage).</div>
         </details>
       </div>
 
     </div>
 
+    <div id="resizer" class="resizer" title="Træk for at ændre menu-bredde"></div>
     <div id="map"></div>
   </div>
 
@@ -213,21 +238,13 @@
     const PER_REQUEST_DELAY_MS = 80;
     const LIMIT_TO_CPH = true; // geokodning begrænses i baggrunden til kommunekode 0101
     const STORAGE_KEY = "valgsteder_state_v4";
+    const UI_KEY = "valgsteder_ui_sidebar_v1";
 
     // Overlay styling:
     // - ring 1 + ring 2 kommuner: mørkegrå udfyldning
     // - København: rød outline, ingen fill
-    const NEIGHBOR_STYLE = {
-      color: "#2f2f2f",
-      weight: 1,
-      fillColor: "#2f2f2f",
-      fillOpacity: 0.35
-    };
-    const CPH_OUTLINE_STYLE = {
-      color: "#e11d48",
-      weight: 3,
-      fillOpacity: 0
-    };
+    const NEIGHBOR_STYLE = { color: "#2f2f2f", weight: 1, fillColor: "#2f2f2f", fillOpacity: 0.35 };
+    const CPH_OUTLINE_STYLE = { color: "#e11d48", weight: 3, fillOpacity: 0 };
 
     const COLOR_PRESETS = [
       { label: "Rød",   value: "#e11d48" },
@@ -269,13 +286,14 @@
     const markerGroup = L.layerGroup().addTo(map);
 
     // ----------------- State -----------------
-    // entry: {id, kredsKey, name, address, color, radius, lat, lng}
+    // entry: {id, kredsKey, name, address, color, radius, opacity, lat, lng}
     const entries = [];
 
     // Filtre: kun kredse/kategorier
     const selectedKredse = new Set(KREDS_OPTIONS.map(o => o.key));
 
-    let currentOpacity = 0.55;
+    // Default opacity (bruges også til nye punkter)
+    let defaultOpacity = 0.55;
 
     const markerById = new Map();
     const editingIds = new Set();
@@ -303,7 +321,7 @@
 
     function clampOpacity(v) {
       const n = Number(v);
-      if (!Number.isFinite(n)) return currentOpacity;
+      if (!Number.isFinite(n)) return defaultOpacity;
       return Math.max(0, Math.min(1, Math.round(n * 20) / 20)); // 0.05 step
     }
 
@@ -316,6 +334,26 @@
         selectEl.appendChild(opt);
       }
       selectEl.value = defaultValue || COLOR_PRESETS[0].value;
+    }
+
+    function populateBulkTargetColor() {
+      const sel = document.getElementById('bulkTargetColor');
+      sel.innerHTML = '';
+
+      const all = document.createElement('option');
+      all.value = "__all__";
+      all.textContent = "Alle farver";
+      sel.appendChild(all);
+
+      for (const c of COLOR_PRESETS) {
+        const opt = document.createElement('option');
+        opt.value = c.value;
+        opt.textContent = c.label;
+        sel.appendChild(opt);
+      }
+      sel.value = "__all__";
+      updateBulkTargetHint();
+      updateBulkSummary();
     }
 
     function populateKredsSelect(selectEl, defaultKey) {
@@ -331,7 +369,6 @@
         opt.textContent = o.label;
         selectEl.appendChild(opt);
       }
-
       selectEl.value = defaultKey ?? '';
     }
 
@@ -345,24 +382,27 @@
 
     function markerPopupHtml(e) {
       const colorLabel = COLOR_LABEL_BY_VALUE[e.color] || '';
+      const op = (typeof e.opacity === "number") ? e.opacity : defaultOpacity;
       return `
         <div style="line-height:1.3">
           <b>${escapeHtml(e.name || '(uden navn)')}</b><br/>
           ${escapeHtml(labelForKredsKey(e.kredsKey))}<br/>
           ${escapeHtml(e.address)}<br/>
-          <span style="color:#666">${escapeHtml(colorLabel)}, ${escapeHtml(e.radius)}px</span>
+          <span style="color:#666">${escapeHtml(colorLabel)}, ${escapeHtml(e.radius)}px, opacitet ${escapeHtml(op)}</span>
         </div>
       `;
     }
 
     function ensureMarker(e) {
       let m = markerById.get(e.id);
+      const op = (typeof e.opacity === "number") ? e.opacity : defaultOpacity;
+
       if (!m && Number.isFinite(e.lat) && Number.isFinite(e.lng)) {
         m = L.circleMarker([e.lat, e.lng], {
           radius: e.radius,
           color: e.color,
           fillColor: e.color,
-          fillOpacity: currentOpacity,
+          fillOpacity: op,
           weight: 1
         }).bindPopup(markerPopupHtml(e));
         markerById.set(e.id, m);
@@ -373,10 +413,12 @@
     function updateMarkerStyleAndPopup(e) {
       const m = markerById.get(e.id);
       if (!m) return;
+
+      const op = (typeof e.opacity === "number") ? e.opacity : defaultOpacity;
       m.setStyle({
         color: e.color,
         fillColor: e.color,
-        fillOpacity: currentOpacity,
+        fillOpacity: op,
         weight: 1
       });
       m.setRadius(e.radius);
@@ -396,13 +438,28 @@
       updateSummaries();
     }
 
-    function updateAllMarkersOpacity() {
-      for (const e of entries) {
-        const m = markerById.get(e.id);
-        if (!m) continue;
-        m.setStyle({ fillOpacity: currentOpacity });
+    // ----------------- Bulk targeting by color -----------------
+    function getBulkTargets() {
+      const target = document.getElementById('bulkTargetColor').value;
+      if (target === "__all__") return entries.slice();
+      return entries.filter(e => e.color === target);
+    }
+
+    function updateBulkTargetHint() {
+      const target = document.getElementById('bulkTargetColor').value;
+      const hintEl = document.getElementById('bulkTargetHint');
+      if (target === "__all__") {
+        hintEl.textContent = "Ændringerne påvirker alle farver.";
+      } else {
+        hintEl.textContent = `Ændringerne påvirker kun "${COLOR_LABEL_BY_VALUE[target] || target}".`;
       }
-      updateVisibility();
+      updateBulkSummary();
+    }
+
+    function updateBulkSummary() {
+      const total = entries.length;
+      const count = getBulkTargets().length;
+      document.getElementById('bulkSummary').textContent = total ? `${count}/${total}` : '';
     }
 
     // ----------------- Kommuner overlay (ring 1 + ring 2) -----------------
@@ -462,7 +519,7 @@
 
         // Adjacency: kommune -> set af naboer (deler mindst én key)
         const adjacency = new Map();
-        for (const [k, codesSet] of keyToCodes.entries()) {
+        for (const [, codesSet] of keyToCodes.entries()) {
           const codes = Array.from(codesSet);
           if (codes.length < 2) continue;
           for (let i=0;i<codes.length;i++) {
@@ -494,13 +551,13 @@
           }
         }
 
-        // Vi vil farve alle med depth 1 eller 2, plus Frederiksberg (0147), men ikke København selv.
+        // Farv alle med depth 1 eller 2, plus Frederiksberg (0147), men ikke København selv.
         const grayCodes = new Set();
         for (const [code, d] of depth.entries()) {
           if (code === start) continue;
           if (d === 1 || d === 2) grayCodes.add(code);
         }
-        grayCodes.add("0147"); // Frederiksberg med uanset hvad
+        grayCodes.add("0147"); // Frederiksberg
 
         const grayFeatures = [];
         for (const code of grayCodes) {
@@ -529,8 +586,8 @@
     // ----------------- Persistence -----------------
     function saveState() {
       const state = {
-        version: 4,
-        opacity: currentOpacity,
+        version: 5,
+        defaultOpacity,
         selectedKredse: [...selectedKredse],
         entries: entries.map(e => ({
           id: e.id,
@@ -539,11 +596,13 @@
           address: e.address,
           color: e.color,
           radius: e.radius,
+          opacity: (typeof e.opacity === "number") ? e.opacity : defaultOpacity,
           lat: e.lat,
           lng: e.lng
         }))
       };
       try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch {}
+      updateBulkSummary();
     }
 
     function loadState() {
@@ -553,7 +612,8 @@
         const s = JSON.parse(raw);
         if (!s || !Array.isArray(s.entries)) return;
 
-        currentOpacity = clampOpacity(s.opacity ?? 0.55);
+        // Bagudkompatibel: tidligere brugte "opacity"
+        defaultOpacity = clampOpacity(s.defaultOpacity ?? s.opacity ?? 0.55);
 
         selectedKredse.clear();
         const defaults = KREDS_OPTIONS.map(o => o.key);
@@ -569,6 +629,7 @@
             address: e.address || "",
             color: e.color || COLOR_PRESETS[0].value,
             radius: clampRadius(e.radius ?? 12),
+            opacity: clampOpacity(e.opacity ?? defaultOpacity),
             lat: (typeof e.lat === "number" ? e.lat : undefined),
             lng: (typeof e.lng === "number" ? e.lng : undefined),
           });
@@ -673,6 +734,7 @@
       document.getElementById('filterSummary').textContent = `${visible}/${entries.length} vises`;
       document.getElementById('listSummary').textContent = `${entries.length} total`;
       renderKredsSummaries();
+      updateBulkSummary();
     }
 
     // ----------------- Liste pr. kreds/kategori -----------------
@@ -709,10 +771,10 @@
               <table>
                 <thead>
                   <tr>
-                    <th style="width: 26%;">Navn</th>
-                    <th>Adresse</th>
-                    <th style="width: 18%;">Stil</th>
-                    <th style="width: 18%;">Handling</th>
+                    <th style="width: 28%;">Navn</th>
+                    <th style="width: 36%;">Adresse</th>
+                    <th style="width: 16%;">Stil</th>
+                    <th style="width: 20%;">Handling</th>
                   </tr>
                 </thead>
                 <tbody id="tbody_k_${o.key}"></tbody>
@@ -744,8 +806,8 @@
                 <td>${styleHtml}</td>
                 <td>
                   <div class="actions">
-                    <button class="mini" data-edit="${e.id}">Redigér</button>
-                    <button class="mini" data-del="${e.id}">Slet</button>
+                    <button class="mini" data-edit="${e.id}" type="button">Redigér</button>
+                    <button class="mini" data-del="${e.id}" type="button">Slet</button>
                   </div>
                 </td>
               `;
@@ -768,8 +830,8 @@
                 </td>
                 <td>
                   <div class="actions">
-                    <button class="mini primary" data-save="${e.id}">Gem</button>
-                    <button class="mini" data-cancel="${e.id}">Fortryd</button>
+                    <button class="mini primary" data-save="${e.id}" type="button">Gem</button>
+                    <button class="mini" data-cancel="${e.id}" type="button">Fortryd</button>
                   </div>
                 </td>
               `;
@@ -838,6 +900,7 @@
             e.address = b.address;
             e.color = b.color;
             e.radius = b.radius;
+            e.opacity = b.opacity;
             e.lat = b.lat;
             e.lng = b.lng;
 
@@ -903,6 +966,7 @@
             e.address = b.address;
             e.color = b.color;
             e.radius = b.radius;
+            e.opacity = b.opacity;
             e.lat = b.lat;
             e.lng = b.lng;
 
@@ -944,7 +1008,18 @@
         return;
       }
 
-      const e = { id: uuid(), kredsKey, name, address, color, radius, lat: undefined, lng: undefined };
+      const e = {
+        id: uuid(),
+        kredsKey,
+        name,
+        address,
+        color,
+        radius,
+        opacity: defaultOpacity,
+        lat: undefined,
+        lng: undefined
+      };
+
       entries.push(e);
       renderKredsLists();
       setStatus('');
@@ -977,12 +1052,13 @@
       }
     }
 
-    // ----------------- Bulk handlers -----------------
+    // ----------------- Bulk handlers (segmenteret efter farve) -----------------
     function applyBulkRadius() {
+      const targets = getBulkTargets();
       const r = clampRadius(document.getElementById('bulkRadiusNumber').value);
-      if (entries.length === 0) { setStatus('Der er ingen punkter at opdatere.'); return; }
+      if (targets.length === 0) { setStatus('Ingen valgsteder matcher den valgte farve.'); return; }
 
-      for (const e of entries) {
+      for (const e of targets) {
         e.radius = r;
         ensureMarker(e);
         updateMarkerStyleAndPopup(e);
@@ -994,10 +1070,11 @@
     }
 
     function applyBulkColor() {
+      const targets = getBulkTargets();
       const c = document.getElementById('bulkColor').value;
-      if (entries.length === 0) { setStatus('Der er ingen punkter at opdatere.'); return; }
+      if (targets.length === 0) { setStatus('Ingen valgsteder matcher den valgte farve.'); return; }
 
-      for (const e of entries) {
+      for (const e of targets) {
         e.color = c;
         ensureMarker(e);
         updateMarkerStyleAndPopup(e);
@@ -1006,32 +1083,108 @@
       renderKredsLists();
       updateVisibility();
       setStatus('');
+      updateBulkTargetHint(); // hvis man ændrer farver, kan målgruppen ændre sig
     }
 
-    // Opacity (for alle) i "Ændringer for alle valgsteder"
+    // Opacity (segmenteret efter farve, eller alle)
     const bulkOpacityRange = document.getElementById('bulkOpacityRange');
     const bulkOpacityNumber = document.getElementById('bulkOpacityNumber');
 
     function syncBulkOpacityFrom(source) {
-      currentOpacity = clampOpacity(source.value);
-      bulkOpacityRange.value = String(currentOpacity);
-      bulkOpacityNumber.value = String(currentOpacity);
-      updateAllMarkersOpacity();
+      const op = clampOpacity(source.value);
+
+      // Opdater UI + default
+      defaultOpacity = op;
+      bulkOpacityRange.value = String(op);
+      bulkOpacityNumber.value = String(op);
+
+      // Sæt opacitet på målgruppen
+      const targets = getBulkTargets();
+      if (targets.length === 0 && entries.length > 0) {
+        setStatus('Ingen valgsteder matcher den valgte farve.');
+        saveState();
+        return;
+      }
+
+      for (const e of targets) {
+        e.opacity = op;
+        ensureMarker(e);
+        updateMarkerStyleAndPopup(e);
+      }
+
       saveState();
+      renderKredsLists();
+      updateVisibility();
       setStatus('');
+    }
+
+    // ----------------- Sidebar resizer -----------------
+    function setSidebarWidth(px) {
+      const w = Math.max(280, Math.min(720, Math.round(px)));
+      document.documentElement.style.setProperty('--sidebar', w + 'px');
+      // Leaflet skal have besked om resize
+      requestAnimationFrame(() => map.invalidateSize());
+      try { localStorage.setItem(UI_KEY, JSON.stringify({ sidebarWidth: w })); } catch {}
+    }
+
+    function loadSidebarWidth() {
+      try {
+        const raw = localStorage.getItem(UI_KEY);
+        if (!raw) return;
+        const s = JSON.parse(raw);
+        const w = Number(s.sidebarWidth);
+        if (Number.isFinite(w)) setSidebarWidth(w);
+      } catch {}
+    }
+
+    function initResizer() {
+      const handle = document.getElementById('resizer');
+      let dragging = false;
+      let startX = 0;
+      let startW = 0;
+
+      const onMove = (e) => {
+        if (!dragging) return;
+        setSidebarWidth(startW + (e.clientX - startX));
+      };
+      const onUp = () => {
+        dragging = false;
+        document.body.style.userSelect = '';
+        window.removeEventListener('mousemove', onMove);
+        window.removeEventListener('mouseup', onUp);
+      };
+
+      handle.addEventListener('mousedown', (e) => {
+        dragging = true;
+        startX = e.clientX;
+        const cs = getComputedStyle(document.documentElement);
+        startW = parseInt(cs.getPropertyValue('--sidebar'), 10) || 420;
+        document.body.style.userSelect = 'none';
+        window.addEventListener('mousemove', onMove);
+        window.addEventListener('mouseup', onUp);
+      });
+
+      // Dobbeltklik = reset
+      handle.addEventListener('dblclick', () => setSidebarWidth(420));
     }
 
     // ----------------- Init -----------------
     populateKredsSelect(document.getElementById('kreds'));
     populateColorSelect(document.getElementById('color'), COLOR_PRESETS[0].value);
     populateColorSelect(document.getElementById('bulkColor'), COLOR_PRESETS[0].value);
+    populateBulkTargetColor();
 
+    loadSidebarWidth();
     loadState();
 
-    bulkOpacityRange.value = String(currentOpacity);
-    bulkOpacityNumber.value = String(currentOpacity);
+    // Init opacity UI til defaultOpacity
+    bulkOpacityRange.value = String(defaultOpacity);
+    bulkOpacityNumber.value = String(defaultOpacity);
 
+    // Recreate markers
     for (const e of entries) {
+      // sikr at alle har opacity
+      if (typeof e.opacity !== "number") e.opacity = defaultOpacity;
       ensureMarker(e);
       updateMarkerStyleAndPopup(e);
     }
@@ -1043,6 +1196,7 @@
 
     // Kommuner overlay: ring 1 + ring 2 grå + København rød outline
     addCphRing2Overlay();
+    initResizer();
 
     // bind
     document.getElementById('add').addEventListener('click', addEntry);
@@ -1051,6 +1205,10 @@
 
     document.getElementById('kredsAll').addEventListener('click', () => setAllKredse(true));
     document.getElementById('kredsNone').addEventListener('click', () => setAllKredse(false));
+
+    document.getElementById('bulkTargetColor').addEventListener('change', () => {
+      updateBulkTargetHint();
+    });
 
     bulkOpacityRange.addEventListener('input', () => syncBulkOpacityFrom(bulkOpacityRange));
     bulkOpacityNumber.addEventListener('input', () => syncBulkOpacityFrom(bulkOpacityNumber));
@@ -1082,6 +1240,7 @@
       renderKredsLists();
       updateVisibility();
       setStatus('');
+      updateBulkSummary();
     });
   </script>
 </body>
