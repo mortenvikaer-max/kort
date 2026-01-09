@@ -265,83 +265,83 @@
 
     // --------- FORUDINDSATTE VALGSTEDER ---------
     // Alle sættes som: rød (#e11d48), radius 8. Adresser renset for bedre DAWA-match.
-    const DEFAULT_VALGSTEDER = [
-      // 1. kreds
-      { kredsKey:"1", name:"1. Nord. Strandvejsskolen", address:"Sionsgade 1" },
-      { kredsKey:"1", name:"1. Nordhavn. Østerbrohuset", address:"Århusgade 103" },
-      { kredsKey:"1", name:"1. Nordvest. Kildevældskolen", address:"Bellmansgade 5A" },
-      { kredsKey:"1", name:"1. Syd. Remisen", address:"Blegdamsvej 132" },
-      { kredsKey:"1", name:"1. Vest. Nørre Fælled Skole", address:"Biskop Krags Vænge 7" },
-      { kredsKey:"1", name:"1. Øst. Skolen På Strandboulevarden", address:"Strandboulevarden 47" },
-      { kredsKey:"1", name:"1. Østerbro. Idrætshuset", address:"Gunnar Nu Hansens Plads 7" },
+const DEFAULT_VALGSTEDER = [
+  // 1. kreds
+  { kredsKey:"1", name:"1. Nord. Strandvejsskolen", address:"Sionsgade 1" },
+  { kredsKey:"1", name:"1. Nordhavn. Østerbrohuset", address:"Århusgade 103" },
+  { kredsKey:"1", name:"1. Nordvest. Kildevældskolen", address:"Bellmansgade 5A" },
+  { kredsKey:"1", name:"1. Syd. Remisen", address:"Blegdamsvej 132" },
+  { kredsKey:"1", name:"1. Vest. Nørre Fælled Skole", address:"Biskop Krags Vænge 7" },
+  { kredsKey:"1", name:"1. Øst. Skolen På Strandboulevarden", address:"Strandboulevarden 47" },
+  { kredsKey:"1", name:"1. Østerbro. Idrætshuset", address:"Gunnar Nu Hansens Plads 7" },
 
-      // 2. kreds
-      { kredsKey:"2", name:"2. Kalvebod Fælled. Kalvebod Fælled Skole", address:"Else Alfelts Vej 2" },
-      { kredsKey:"2", name:"2. Nord. Amager Fælled Skole", address:"Sundholmsvej 2A" },
-      { kredsKey:"2", name:"2. Peder Lykke. Peder Lykke Skolen", address:"Birketinget 3" },
-      { kredsKey:"2", name:"2. Sundbyvester. Sundby Idrætspark", address:"Englandsvej 61" },
-      { kredsKey:"2", name:"2. Ørestad. Ørestad Gymnasium", address:"Arne Jacobsens Allé 21" },
-      { kredsKey:"2", name:"2. Vest. Skolen På Islands Brygge", address:"Artillerivej 57" },
-      { kredsKey:"2", name:"2. Øst. Dyvekeskolen", address:"Remisevej 16" },
+  // 2. kreds
+  { kredsKey:"2", name:"2. Kalvebod Fælled", address:"Else Alfelts Vej 2" },
+  { kredsKey:"2", name:"2. Nord. Amager Fælled Skole", address:"Sundholmsvej 2A" },
+  { kredsKey:"2", name:"2. Peder Lykke. Peder Lykke Skolen", address:"Birketinget 3" },
+  { kredsKey:"2", name:"2. Sundbyvester. Sundby Idrætspark", address:"Englandsvej 61" },
+  { kredsKey:"2", name:"2. Ørestad. Ørestad Gymnasium", address:"Arne Jacobsens Allé 21" },
+  { kredsKey:"2", name:"2. Vest. Skolen På Islands Brygge", address:"Artillerivej 57" },
+  { kredsKey:"2", name:"2. Øst. Dyvekeskolen", address:"Remisevej 16" },
 
-      // 3. kreds
-      { kredsKey:"3", name:"3. Indre By. Rådhushallen", address:"Rådhuspladsen 1" },
-      { kredsKey:"3", name:"3. Midt. Den Classenske Legatskole", address:"Vester Voldgade 98" },
-      { kredsKey:"3", name:"3. Nord. Øster Farimagsgade Skole", address:"Øster Farimagsgade 40" },
-      { kredsKey:"3", name:"3. Syd. Hal C", address:"Arsenalvej 6" },
-      { kredsKey:"3", name:"3. Sølvgade. Sølvgades Skole", address:"Sølvgade 16" },
-      { kredsKey:"3", name:"3. Øst. Nyboder Skole", address:"Øster Voldgade 15" },
+  // 3. kreds
+  { kredsKey:"3", name:"3. Indre By. Rådhushallen", address:"Rådhuspladsen 1" },
+  { kredsKey:"3", name:"3. Midt. Den Classenske Legatskole", address:"Vester Voldgade 98" },
+  { kredsKey:"3", name:"3. Nord. Øster Farimagsgade Skole", address:"Øster Farimagsgade 40" },
+  { kredsKey:"3", name:"3. Syd. Hal C", address:"Arsenalvej 6" },
+  { kredsKey:"3", name:"3. Sølvgade. Sølvgades Skole", address:"Sølvgade 16" },
+  { kredsKey:"3", name:"3. Øst. Nyboder Skole", address:"Øster Voldgade 15" },
 
-      // 4. kreds (Sundbyøster)
-      { kredsKey:"4", name:"4. Nord. Skolen På Amagerbro", address:"Lybækgade 20" },
-      { kredsKey:"4", name:"4. Nordøst. Nordøstamager Skole", address:"Holmbladsgade 117" },
-      { kredsKey:"4", name:"4. Sundbyøster. Lergravsparkens Skole", address:"Wittenberggade 2" },
-      { kredsKey:"4", name:"4. Syd. Gerbrandskolen", address:"Gerbrandsvej 9" },
-      { kredsKey:"4", name:"4. Øst. Skolen Ved Sundet", address:"Samosvej 50" },
+  // 4. kreds, Sundbyøster
+  { kredsKey:"4", name:"4. Nord. Skolen På Amagerbro", address:"Lybækgade 20" },
+  { kredsKey:"4", name:"4. Nordøst. Nordøstamager Skole", address:"Holmbladsgade 117" },
+  { kredsKey:"4", name:"4. Sundbyøster. Lergravsparkens Skole", address:"Wittenberggade 2" },
+  { kredsKey:"4", name:"4. Syd. Gerbrandskolen", address:"Gerbrandsvej 9" },
+  { kredsKey:"4", name:"4. Øst. Skolen Ved Sundet", address:"Samosvej 50" },
 
-      // 5. kreds (Nørrebro)
-      { kredsKey:"5", name:"5. Nord. Rådmandsgades Skole", address:"Rådmandsgade 22" },
-      { kredsKey:"5", name:"5. Nordvest. Frederiksgård Skole", address:"Ørholmsgade 8" },
-      { kredsKey:"5", name:"5. Nørrebro. Guldberg Skole", address:"Sjællandsgade 10" },
-      { kredsKey:"5", name:"5. Nørrebrohallen. Nørrebrohallen", address:"Nørrebrogade 208" },
-      { kredsKey:"5", name:"5. Syd. Korsgadehallen", address:"Korsgade 29" },
-      { kredsKey:"5", name:"5. Vest. Nørrebro Park Skole", address:"Jagtvej 34" },
-      { kredsKey:"5", name:"5. Øst. Plejecentret Sølund", address:"Ryesgade 20A" },
+  // 5. kreds, Nørrebro
+  { kredsKey:"5", name:"5. Nord. Rådmandsgades Skole", address:"Rådmandsgade 22" },
+  { kredsKey:"5", name:"5. Nordvest. Frederiksgård Skole", address:"Ørholmgade 8" },
+  { kredsKey:"5", name:"5. Nørrebro. Guldberg Skole", address:"Sjællandsgade 10" },
+  { kredsKey:"5", name:"5. Nørrebrohallen. Nørrebrohallen", address:"Nørrebrogade 208" },
+  { kredsKey:"5", name:"5. Syd. Korsgadehallen", address:"Korsgade 29" },
+  { kredsKey:"5", name:"5. Vest. Nørrebro Park Skole", address:"Jagtvej 34" },
+  { kredsKey:"5", name:"5. Øst. Plejecentret Sølund", address:"Ryesgade 20A" },
 
-      // 6. kreds (Bispebjerg)
-      { kredsKey:"6", name:"6. Bispebjerg. Tagensbo Skole", address:"Hovmestervej 19" },
-      { kredsKey:"6", name:"6. Nord. Holbergskolen", address:"Frederiksborgvej 216" },
-      { kredsKey:"6", name:"6. Syd. Grøndalsvængets Skole", address:"Rørsangervej 29" },
-      { kredsKey:"6", name:"6. Vest. Utterslev Skole", address:"Skoleholdervej 20" },
-      { kredsKey:"6", name:"6. Øst. Lundehusskolen", address:"Lersø Parkallé 152" },
+  // 6. kreds, Bispebjerg
+  { kredsKey:"6", name:"6. Bispebjerg. Tagensbo Skole", address:"Hovmestervej 19" },
+  { kredsKey:"6", name:"6. Nord. Holbergskolen", address:"Frederiksborgvej 216" },
+  { kredsKey:"6", name:"6. Syd. Grøndalsvængets Skole", address:"Rørsangervej 29" },
+  { kredsKey:"6", name:"6. Vest. Utterslev Skole", address:"Skoleholdervej 20" },
+  { kredsKey:"6", name:"6. Øst. Lundehusskolen", address:"Lersø Parkallé 152" },
 
-      // 7. kreds (Brønshøj/Vanløse/Husum)
-      { kredsKey:"7", name:"7. Kirkebjerg. Kirkebjerg Skole", address:"Vanløsehøj 4" },
-      { kredsKey:"7", name:"7. Nord. Tingbjerg Skole", address:"Skolesiden 2" },
-      { kredsKey:"7", name:"7. Nordvest. Husum Skole", address:"Karlslundevej 23" },
-      { kredsKey:"7", name:"7. Rødkilde. Rødkilde Skole", address:"Godthåbsvej 274" },
-      { kredsKey:"7", name:"7. Vanløse. Vanløsehallerne", address:"Lønstrupvej 5" },
-      { kredsKey:"7", name:"7. Vest. Energicenter Voldparken", address:"Kobbelvænget 65" },
-      { kredsKey:"7", name:"7. Øst. Bellahøj Skole", address:"Svenskelejren 18" },
+  // 7. kreds, Brønshøj
+  { kredsKey:"7", name:"7. Kirkebjerg. Kirkebjerg Skole", address:"Vanløsehøj 4" },
+  { kredsKey:"7", name:"7. Nord. Tingbjerg Skole", address:"Skolesiden 2" },
+  { kredsKey:"7", name:"7. Nordvest. Husum Skole", address:"Karlslundevej 23" },
+  { kredsKey:"7", name:"7. Rødkilde. Rødkilde Skole", address:"Godthåbsvej 274" },
+  { kredsKey:"7", name:"7. Vanløse. Vanløsehallerne", address:"Hirtshalsvej 6C" },
+  { kredsKey:"7", name:"7. Vest. Energicenter Voldparken", address:"Kobbelvænget 65" },
+  { kredsKey:"7", name:"7. Øst. Bellahøj Skole", address:"Svenskelejren 18" },
 
-      // 8. kreds (Valby)
-      { kredsKey:"8", name:"8. Midt. Vigerslev Allés Skole", address:"Vigerslev Allé 108" },
-      { kredsKey:"8", name:"8. Nord. Prøvehallen", address:"Porcelænstorvet 4" },
-      { kredsKey:"8", name:"8. Syd. Kirsebærhavens Skole", address:"Kirsebærhaven 23" },
-      { kredsKey:"8", name:"8. Sydøst. Sankt Annæ Gymnasium", address:"Sjælør Boulevard 135" },
-      { kredsKey:"8", name:"8. Valby. Ålholm Skole", address:"Vibeholmen 1" },
-      { kredsKey:"8", name:"8. Vest. Lykkebo Hallen", address:"Lykkebovej 32" },
+  // 8. kreds, Valby
+  { kredsKey:"8", name:"8. Midt. Vigerslev Allés Skole", address:"Vigerslev Allé 108" },
+  { kredsKey:"8", name:"8. Nord. Prøvehallen", address:"Porcelænstorvet 4" },
+  { kredsKey:"8", name:"8. Syd. Kirsebærhavens Skole", address:"Kirsebærhaven 23" },
+  { kredsKey:"8", name:"8. Sydøst. Sankt Annæ Gymnasium", address:"Sjælør Boulevard 135" },
+  { kredsKey:"8", name:"8. Valby. Ålholm Skole", address:"Vibeholmen 1" },
+  { kredsKey:"8", name:"8. Vest. Lykkebo Hallen", address:"Lykkebovej 30" },
 
-      // 9. kreds (Vesterbro/Sydhavn)
-      { kredsKey:"9", name:"9. Midt. Bavnehøjhallen", address:"Enghavevej 90" },
-      { kredsKey:"9", name:"9. Nord. Oehlenschlægersgades Skole", address:"Oehlenschlægersgade 57" },
-      { kredsKey:"9", name:"9. Sluseholmen. Sluseholmen Skole", address:"Ved Stigbordene 26" },
-      { kredsKey:"9", name:"9. Syd. Ellebjerg Skole", address:"P. Knudsens Gade 37-39" },
-      { kredsKey:"9", name:"9. Sydhavn. Skolen I Sydhavnen", address:"Støberigade 1" },
-      { kredsKey:"9", name:"9. Vest. Vesterbro Ny Skole", address:"Slesvigsgade 6" },
-      { kredsKey:"9", name:"9. Vesterbro. Tove Ditlevsens Skole", address:"Enghave Plads 21" },
-      { kredsKey:"9", name:"9. Øst. Skolen Ved Dybbølsbro", address:"Kødboderne 8" },
-    ];
+  // 9. kreds, Vesterbro
+  { kredsKey:"9", name:"9. Midt. Bavnehøjhallen", address:"Enghavevej 90" },
+  { kredsKey:"9", name:"9. Nord. Oehlenschlægersgades Skole", address:"Oehlenschlægersgade 57" },
+  { kredsKey:"9", name:"9. Sluseholmen. Sluseholmen Skole", address:"Ved Stigbordene 26" },
+  { kredsKey:"9", name:"9. Syd. Ellebjerg Skole", address:"P. Knudsens Gade 37" },
+  { kredsKey:"9", name:"9. Sydhavn. Skolen I Sydhavnen", address:"Støberigade 1" },
+  { kredsKey:"9", name:"9. Vest. Vesterbro Ny Skole", address:"Slesvigsgade 6" },
+  { kredsKey:"9", name:"9. Vesterbro. Tove Ditlevsens Skole", address:"Enghave Plads 21" },
+  { kredsKey:"9", name:"9. Øst. Skolen Ved Dybbølsbro", address:"Kødboderne 8" },
+];
 
     const DEFAULT_SEED_STYLE = {
       color: "#e11d48",
