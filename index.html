@@ -61,15 +61,6 @@
     }
     th { color:#666; font-weight: 600; }
 
-    .pill {
-      display: inline-flex; align-items: center; gap: 6px;
-      padding: 3px 8px; border: 1px solid #0001; border-radius: 999px;
-      background: #fff;
-      white-space: nowrap;
-      max-width: 100%;
-    }
-    .swatch { width: 10px; height: 10px; border-radius: 50%; border: 1px solid #0002; display:inline-block; flex: none; }
-
     /* IMPORTANT: wrap actions so they never overflow */
     .actions { display:flex; gap:6px; flex-wrap: wrap; align-items:center; }
     .mini {
@@ -180,7 +171,7 @@
       <div class="section">
         <details open>
           <summary>
-            Liste
+            Valgsteder fordelt på kreds
             <span class="summaryRight" id="listSummary"></span>
           </summary>
           <div id="kredsLists"></div>
@@ -237,9 +228,11 @@
     // ----------------- Konfiguration -----------------
     const PER_REQUEST_DELAY_MS = 80;
     const LIMIT_TO_CPH = true; // geokodning begrænses i baggrunden til kommunekode 0101
-    const STORAGE_KEY = "valgsteder_state_v4";
+
+    // Bump keys, så gamle localStorage-data ikke “overlever” deploys ved en fejl
+    const STORAGE_KEY = "valgsteder_state_v6";
     const UI_KEY = "valgsteder_ui_sidebar_v1";
-    const SEED_KEY = "valgsteder_seed_v1";
+    const SEED_KEY = "valgsteder_seed_v2";
 
     const NEIGHBOR_STYLE = { color: "#2f2f2f", weight: 1, fillColor: "#2f2f2f", fillOpacity: 0.35 };
     const CPH_OUTLINE_STYLE = { color: "#e11d48", weight: 1, fillOpacity: 0 };
@@ -264,88 +257,87 @@
     const KREDS_LABEL_BY_KEY = Object.fromEntries(KREDS_OPTIONS.map(o => [o.key, o.label]));
 
     // --------- FORUDINDSATTE VALGSTEDER ---------
-    // Alle sættes som: rød (#e11d48), radius 8. Adresser renset for bedre DAWA-match.
-const DEFAULT_VALGSTEDER = [
-  // 1. kreds
-  { kredsKey:"1", name:"1. Nord. Strandvejsskolen", address:"Sionsgade 1" },
-  { kredsKey:"1", name:"1. Nordhavn. Østerbrohuset", address:"Århusgade 103" },
-  { kredsKey:"1", name:"1. Nordvest. Kildevældskolen", address:"Bellmansgade 5A" },
-  { kredsKey:"1", name:"1. Syd. Remisen", address:"Blegdamsvej 132" },
-  { kredsKey:"1", name:"1. Vest. Nørre Fælled Skole", address:"Biskop Krags Vænge 7" },
-  { kredsKey:"1", name:"1. Øst. Skolen På Strandboulevarden", address:"Strandboulevarden 47" },
-  { kredsKey:"1", name:"1. Østerbro. Idrætshuset", address:"Gunnar Nu Hansens Plads 7" },
+    const DEFAULT_VALGSTEDER = [
+      // 1. kreds
+      { kredsKey:"1", name:"1. Nord. Strandvejsskolen", address:"Sionsgade 1" },
+      { kredsKey:"1", name:"1. Nordhavn. Østerbrohuset", address:"Århusgade 103" },
+      { kredsKey:"1", name:"1. Nordvest. Kildevældskolen", address:"Bellmansgade 5A" },
+      { kredsKey:"1", name:"1. Syd. Remisen", address:"Blegdamsvej 132" },
+      { kredsKey:"1", name:"1. Vest. Nørre Fælled Skole", address:"Biskop Krags Vænge 7" },
+      { kredsKey:"1", name:"1. Øst. Skolen På Strandboulevarden", address:"Strandboulevarden 47" },
+      { kredsKey:"1", name:"1. Østerbro. Idrætshuset", address:"Gunnar Nu Hansens Plads 7" },
 
-  // 2. kreds
-  { kredsKey:"2", name:"2. Kalvebod Fælled", address:"Else Alfelts Vej 2" },
-  { kredsKey:"2", name:"2. Nord. Amager Fælled Skole", address:"Sundholmsvej 2A" },
-  { kredsKey:"2", name:"2. Peder Lykke. Peder Lykke Skolen", address:"Birketinget 3" },
-  { kredsKey:"2", name:"2. Sundbyvester. Sundby Idrætspark", address:"Englandsvej 61" },
-  { kredsKey:"2", name:"2. Ørestad. Ørestad Gymnasium", address:"Arne Jacobsens Allé 21" },
-  { kredsKey:"2", name:"2. Vest. Skolen På Islands Brygge", address:"Artillerivej 57" },
-  { kredsKey:"2", name:"2. Øst. Dyvekeskolen", address:"Remisevej 16" },
+      // 2. kreds
+      { kredsKey:"2", name:"2. Kalvebod Fælled", address:"Else Alfelts Vej 2" },
+      { kredsKey:"2", name:"2. Nord. Amager Fælled Skole", address:"Sundholmsvej 2A" },
+      { kredsKey:"2", name:"2. Peder Lykke. Peder Lykke Skolen", address:"Birketinget 3" },
+      { kredsKey:"2", name:"2. Sundbyvester. Sundby Idrætspark", address:"Englandsvej 61" },
+      { kredsKey:"2", name:"2. Ørestad. Ørestad Gymnasium", address:"Arne Jacobsens Allé 21" },
+      { kredsKey:"2", name:"2. Vest. Skolen På Islands Brygge", address:"Artillerivej 57" },
+      { kredsKey:"2", name:"2. Øst. Dyvekeskolen", address:"Remisevej 16" },
 
-  // 3. kreds
-  { kredsKey:"3", name:"3. Indre By. Rådhushallen", address:"Rådhuspladsen 1" },
-  { kredsKey:"3", name:"3. Midt. Den Classenske Legatskole", address:"Vester Voldgade 98" },
-  { kredsKey:"3", name:"3. Nord. Øster Farimagsgade Skole", address:"Øster Farimagsgade 40" },
-  { kredsKey:"3", name:"3. Syd. Hal C", address:"Arsenalvej 6" },
-  { kredsKey:"3", name:"3. Sølvgade. Sølvgades Skole", address:"Sølvgade 16" },
-  { kredsKey:"3", name:"3. Øst. Nyboder Skole", address:"Øster Voldgade 15" },
+      // 3. kreds
+      { kredsKey:"3", name:"3. Indre By. Rådhushallen", address:"Rådhuspladsen 1" },
+      { kredsKey:"3", name:"3. Midt. Den Classenske Legatskole", address:"Vester Voldgade 98" },
+      { kredsKey:"3", name:"3. Nord. Øster Farimagsgade Skole", address:"Øster Farimagsgade 40" },
+      { kredsKey:"3", name:"3. Syd. Hal C", address:"Arsenalvej 6" },
+      { kredsKey:"3", name:"3. Sølvgade. Sølvgades Skole", address:"Sølvgade 16" },
+      { kredsKey:"3", name:"3. Øst. Nyboder Skole", address:"Øster Voldgade 15" },
 
-  // 4. kreds, Sundbyøster
-  { kredsKey:"4", name:"4. Nord. Skolen På Amagerbro", address:"Lybækgade 20" },
-  { kredsKey:"4", name:"4. Nordøst. Nordøstamager Skole", address:"Holmbladsgade 117" },
-  { kredsKey:"4", name:"4. Sundbyøster. Lergravsparkens Skole", address:"Wittenberggade 2" },
-  { kredsKey:"4", name:"4. Syd. Gerbrandskolen", address:"Gerbrandsvej 9" },
-  { kredsKey:"4", name:"4. Øst. Skolen Ved Sundet", address:"Samosvej 50" },
+      // 4. kreds, Sundbyøster
+      { kredsKey:"4", name:"4. Nord. Skolen På Amagerbro", address:"Lybækgade 20" },
+      { kredsKey:"4", name:"4. Nordøst. Nordøstamager Skole", address:"Holmbladsgade 117" },
+      { kredsKey:"4", name:"4. Sundbyøster. Lergravsparkens Skole", address:"Wittenberggade 2" },
+      { kredsKey:"4", name:"4. Syd. Gerbrandskolen", address:"Gerbrandsvej 9" },
+      { kredsKey:"4", name:"4. Øst. Skolen Ved Sundet", address:"Samosvej 50" },
 
-  // 5. kreds, Nørrebro
-  { kredsKey:"5", name:"5. Nord. Rådmandsgades Skole", address:"Rådmandsgade 22" },
-  { kredsKey:"5", name:"5. Nordvest. Frederiksgård Skole", address:"Ørholmgade 8" },
-  { kredsKey:"5", name:"5. Nørrebro. Guldberg Skole", address:"Sjællandsgade 10" },
-  { kredsKey:"5", name:"5. Nørrebrohallen. Nørrebrohallen", address:"Nørrebrogade 208" },
-  { kredsKey:"5", name:"5. Syd. Korsgadehallen", address:"Korsgade 29" },
-  { kredsKey:"5", name:"5. Vest. Nørrebro Park Skole", address:"Jagtvej 34" },
-  { kredsKey:"5", name:"5. Øst. Plejecentret Sølund", address:"Ryesgade 20A" },
+      // 5. kreds, Nørrebro
+      { kredsKey:"5", name:"5. Nord. Rådmandsgades Skole", address:"Rådmandsgade 22" },
+      { kredsKey:"5", name:"5. Nordvest. Frederiksgård Skole", address:"Ørholmgade 8" },
+      { kredsKey:"5", name:"5. Nørrebro. Guldberg Skole", address:"Sjællandsgade 10" },
+      { kredsKey:"5", name:"5. Nørrebrohallen. Nørrebrohallen", address:"Nørrebrogade 208" },
+      { kredsKey:"5", name:"5. Syd. Korsgadehallen", address:"Korsgade 29" },
+      { kredsKey:"5", name:"5. Vest. Nørrebro Park Skole", address:"Jagtvej 34" },
+      { kredsKey:"5", name:"5. Øst. Plejecentret Sølund", address:"Ryesgade 20A" },
 
-  // 6. kreds, Bispebjerg
-  { kredsKey:"6", name:"6. Bispebjerg. Tagensbo Skole", address:"Hovmestervej 19" },
-  { kredsKey:"6", name:"6. Nord. Holbergskolen", address:"Frederiksborgvej 216" },
-  { kredsKey:"6", name:"6. Syd. Grøndalsvængets Skole", address:"Rørsangervej 29" },
-  { kredsKey:"6", name:"6. Vest. Utterslev Skole", address:"Skoleholdervej 20" },
-  { kredsKey:"6", name:"6. Øst. Lundehusskolen", address:"Lersø Parkallé 152" },
+      // 6. kreds, Bispebjerg
+      { kredsKey:"6", name:"6. Bispebjerg. Tagensbo Skole", address:"Hovmestervej 19" },
+      { kredsKey:"6", name:"6. Nord. Holbergskolen", address:"Frederiksborgvej 216" },
+      { kredsKey:"6", name:"6. Syd. Grøndalsvængets Skole", address:"Rørsangervej 29" },
+      { kredsKey:"6", name:"6. Vest. Utterslev Skole", address:"Skoleholdervej 20" },
+      { kredsKey:"6", name:"6. Øst. Lundehusskolen", address:"Lersø Parkallé 152" },
 
-  // 7. kreds, Brønshøj
-  { kredsKey:"7", name:"7. Kirkebjerg. Kirkebjerg Skole", address:"Vanløsehøj 4" },
-  { kredsKey:"7", name:"7. Nord. Tingbjerg Skole", address:"Skolesiden 2" },
-  { kredsKey:"7", name:"7. Nordvest. Husum Skole", address:"Karlslundevej 23" },
-  { kredsKey:"7", name:"7. Rødkilde. Rødkilde Skole", address:"Godthåbsvej 274" },
-  { kredsKey:"7", name:"7. Vanløse. Vanløsehallerne", address:"Hirtshalsvej 6C" },
-  { kredsKey:"7", name:"7. Vest. Energicenter Voldparken", address:"Kobbelvænget 65" },
-  { kredsKey:"7", name:"7. Øst. Bellahøj Skole", address:"Svenskelejren 18" },
+      // 7. kreds, Brønshøj
+      { kredsKey:"7", name:"7. Kirkebjerg. Kirkebjerg Skole", address:"Vanløsehøj 4" },
+      { kredsKey:"7", name:"7. Nord. Tingbjerg Skole", address:"Skolesiden 2" },
+      { kredsKey:"7", name:"7. Nordvest. Husum Skole", address:"Karlslundevej 23" },
+      { kredsKey:"7", name:"7. Rødkilde. Rødkilde Skole", address:"Godthåbsvej 274" },
+      { kredsKey:"7", name:"7. Vanløse. Vanløsehallerne", address:"Hirtshalsvej 6C" },
+      { kredsKey:"7", name:"7. Vest. Energicenter Voldparken", address:"Kobbelvænget 65" },
+      { kredsKey:"7", name:"7. Øst. Bellahøj Skole", address:"Svenskelejren 18" },
 
-  // 8. kreds, Valby
-  { kredsKey:"8", name:"8. Midt. Vigerslev Allés Skole", address:"Vigerslev Allé 108" },
-  { kredsKey:"8", name:"8. Nord. Prøvehallen", address:"Porcelænstorvet 4" },
-  { kredsKey:"8", name:"8. Syd. Kirsebærhavens Skole", address:"Kirsebærhaven 23" },
-  { kredsKey:"8", name:"8. Sydøst. Sankt Annæ Gymnasium", address:"Sjælør Boulevard 135" },
-  { kredsKey:"8", name:"8. Valby. Ålholm Skole", address:"Vibeholmen 1" },
-  { kredsKey:"8", name:"8. Vest. Lykkebo Hallen", address:"Lykkebovej 30" },
+      // 8. kreds, Valby
+      { kredsKey:"8", name:"8. Midt. Vigerslev Allés Skole", address:"Vigerslev Allé 108" },
+      { kredsKey:"8", name:"8. Nord. Prøvehallen", address:"Porcelænstorvet 4" },
+      { kredsKey:"8", name:"8. Syd. Kirsebærhavens Skole", address:"Kirsebærhaven 23" },
+      { kredsKey:"8", name:"8. Sydøst. Sankt Annæ Gymnasium", address:"Sjælør Boulevard 135" },
+      { kredsKey:"8", name:"8. Valby. Ålholm Skole", address:"Vibeholmen 1" },
+      { kredsKey:"8", name:"8. Vest. Lykkebo Hallen", address:"Lykkebovej 30" },
 
-  // 9. kreds, Vesterbro
-  { kredsKey:"9", name:"9. Midt. Bavnehøjhallen", address:"Enghavevej 90" },
-  { kredsKey:"9", name:"9. Nord. Oehlenschlægersgades Skole", address:"Oehlenschlægersgade 57" },
-  { kredsKey:"9", name:"9. Sluseholmen. Sluseholmen Skole", address:"Ved Stigbordene 26" },
-  { kredsKey:"9", name:"9. Syd. Ellebjerg Skole", address:"P. Knudsens Gade 37" },
-  { kredsKey:"9", name:"9. Sydhavn. Skolen I Sydhavnen", address:"Støberigade 1" },
-  { kredsKey:"9", name:"9. Vest. Vesterbro Ny Skole", address:"Slesvigsgade 6" },
-  { kredsKey:"9", name:"9. Vesterbro. Tove Ditlevsens Skole", address:"Enghave Plads 21" },
-  { kredsKey:"9", name:"9. Øst. Skolen Ved Dybbølsbro", address:"Kødboderne 8" },
-];
+      // 9. kreds, Vesterbro
+      { kredsKey:"9", name:"9. Midt. Bavnehøjhallen", address:"Enghavevej 90" },
+      { kredsKey:"9", name:"9. Nord. Oehlenschlægersgades Skole", address:"Oehlenschlægersgade 57" },
+      { kredsKey:"9", name:"9. Sluseholmen. Sluseholmen Skole", address:"Ved Stigbordene 26" },
+      { kredsKey:"9", name:"9. Syd. Ellebjerg Skole", address:"P. Knudsens Gade 37" },
+      { kredsKey:"9", name:"9. Sydhavn. Skolen I Sydhavnen", address:"Støberigade 1" },
+      { kredsKey:"9", name:"9. Vest. Vesterbro Ny Skole", address:"Slesvigsgade 6" },
+      { kredsKey:"9", name:"9. Vesterbro. Tove Ditlevsens Skole", address:"Enghave Plads 21" },
+      { kredsKey:"9", name:"9. Øst. Skolen Ved Dybbølsbro", address:"Kødboderne 8" },
+    ];
 
     const DEFAULT_SEED_STYLE = {
       color: "#e11d48",
-      radius: 8
+      radius: 6
     };
 
     // ----------------- Kort -----------------
@@ -355,13 +347,20 @@ const DEFAULT_VALGSTEDER = [
       attribution: '&copy; OpenStreetMap'
     }).addTo(map);
 
+    // Naboer (grå) under markører
     map.createPane('neighborsPane');
     map.getPane('neighborsPane').style.zIndex = 430;
     map.getPane('neighborsPane').style.pointerEvents = 'none';
 
+    // København-outline (rød) under markører
     map.createPane('cphOutlinePane');
     map.getPane('cphOutlinePane').style.zIndex = 440;
     map.getPane('cphOutlinePane').style.pointerEvents = 'none';
+
+    // Markører øverst og klikbare
+    map.createPane('markersPane');
+    map.getPane('markersPane').style.zIndex = 650;
+    map.getPane('markersPane').style.pointerEvents = 'auto';
 
     const markerGroup = L.layerGroup().addTo(map);
 
@@ -450,22 +449,18 @@ const DEFAULT_VALGSTEDER = [
       selectEl.value = defaultKey ?? '';
     }
 
-    function labelForKredsKey(k) {
-      return KREDS_LABEL_BY_KEY[k] || String(k);
-    }
-
     function isEntryVisible(e) {
       return selectedKredse.has(e.kredsKey);
     }
 
-function markerPopupHtml(e) {
-  return `
-    <div style="line-height:1.3">
-      <b>${escapeHtml(e.name || '(uden navn)')}</b><br/>
-      ${escapeHtml(e.address || '')}
-    </div>
-  `;
-}
+    function markerPopupHtml(e) {
+      return `
+        <div style="line-height:1.3">
+          <b>${escapeHtml(e.name || '(uden navn)')}</b><br/>
+          ${escapeHtml(e.address || '')}
+        </div>
+      `;
+    }
 
     function ensureMarker(e) {
       let m = markerById.get(e.id);
@@ -473,12 +468,18 @@ function markerPopupHtml(e) {
 
       if (!m && Number.isFinite(e.lat) && Number.isFinite(e.lng)) {
         m = L.circleMarker([e.lat, e.lng], {
+          pane: 'markersPane',
           radius: e.radius,
           color: e.color,
           fillColor: e.color,
           fillOpacity: op,
-          weight: 1
+          weight: 1,
+          interactive: true
         }).bindPopup(markerPopupHtml(e));
+
+        // Robust: åbn popup ved klik
+        m.on('click', () => m.openPopup());
+
         markerById.set(e.id, m);
       }
       return m || null;
@@ -639,7 +640,7 @@ function markerPopupHtml(e) {
     // ----------------- Persistence -----------------
     function saveState() {
       const state = {
-        version: 5,
+        version: 6,
         defaultOpacity,
         selectedKredse: [...selectedKredse],
         entries: entries.map(e => ({
@@ -824,9 +825,8 @@ function markerPopupHtml(e) {
               <table>
                 <thead>
                   <tr>
-                    <th style="width: 28%;">Navn</th>
-                    <th style="width: 36%;">Adresse</th>
-                    <th style="width: 16%;">Stil</th>
+                    <th style="width: 34%;">Navn</th>
+                    <th style="width: 46%;">Adresse</th>
                     <th style="width: 20%;">Handling</th>
                   </tr>
                 </thead>
@@ -846,21 +846,12 @@ function markerPopupHtml(e) {
             const isEditing = editingIds.has(e.id);
 
             if (!isEditing) {
-              const styleHtml = `
-                <span class="pill">
-                  <span class="swatch" style="background:${escapeHtml(e.color)}"></span>
-                  ${escapeHtml(e.radius)}px
-                </span>
-              `;
-
               tr.innerHTML = `
                 <td>${escapeHtml(e.name || '(uden navn)')}</td>
                 <td>${escapeHtml(e.address)}</td>
-                <td>${styleHtml}</td>
                 <td>
                   <div class="actions">
                     <button class="mini" data-edit="${e.id}" type="button">Redigér</button>
-                    <button class="mini" data-del="${e.id}" type="button">Slet</button>
                   </div>
                 </td>
               `;
@@ -872,19 +863,22 @@ function markerPopupHtml(e) {
                     <input class="inlineInput" data-editname="${e.id}" value="${escapeHtml(e.name || '')}" placeholder="Navn"/>
                   </div>
                 </td>
-                <td>
-                  <input class="inlineInput" data-editaddr="${e.id}" value="${escapeHtml(e.address || '')}" placeholder="Adresse"/>
-                </td>
+
                 <td>
                   <div style="display:grid; gap:6px;">
-                    <select class="inlineSelect" data-editcolor="${e.id}"></select>
-                    <input class="inlineNumber" type="number" min="2" max="20" data-editradius="${e.id}" value="${escapeHtml(e.radius)}"/>
+                    <input class="inlineInput" data-editaddr="${e.id}" value="${escapeHtml(e.address || '')}" placeholder="Adresse"/>
+                    <div class="row2" style="gap:6px;">
+                      <select class="inlineSelect" data-editcolor="${e.id}"></select>
+                      <input class="inlineNumber" type="number" min="2" max="20" data-editradius="${e.id}" value="${escapeHtml(e.radius)}"/>
+                    </div>
                   </div>
                 </td>
+
                 <td>
                   <div class="actions">
                     <button class="mini primary" data-save="${e.id}" type="button">Gem</button>
                     <button class="mini" data-cancel="${e.id}" type="button">Fortryd</button>
+                    <button class="mini" data-del="${e.id}" type="button">Slet</button>
                   </div>
                 </td>
               `;
@@ -903,9 +897,11 @@ function markerPopupHtml(e) {
         }
       }
 
-      // bind actions
+      // bind delete (kun i redigér) + confirm
       container.querySelectorAll('button[data-del]').forEach(btn => {
         btn.addEventListener('click', () => {
+          if (!confirm("Er du sikker på, at du vil slette dette valgsted?")) return;
+
           const id = btn.getAttribute('data-del');
           const idx = entries.findIndex(x => x.id === id);
           if (idx < 0) return;
@@ -1223,15 +1219,11 @@ function markerPopupHtml(e) {
       const pending = entries.filter(e => !(Number.isFinite(e.lat) && Number.isFinite(e.lng)));
       if (!pending.length) return;
 
-      setStatus(`Indlæser standardvalgsteder…\nGeokoder ${pending.length} adresser…`);
-
       const failed = [];
       let ok = 0;
 
       for (let i = 0; i < pending.length; i++) {
         const e = pending[i];
-        setStatus(`Indlæser standardvalgsteder…\nGeokoder ${pending.length} adresser…\n${i+1}/${pending.length}: ${e.name}`);
-
         try {
           const r = await geocodeAndSetCoords(e, { flyTo: false });
           if (!r.ok) failed.push({ name: e.name, address: e.address, error: r.error || "Ingen match" });
@@ -1245,14 +1237,16 @@ function markerPopupHtml(e) {
       renderKredsLists();
       updateVisibility();
 
-      let msg = `Færdig ✅\nMatchede: ${ok}\nFejl/ingen match: ${failed.length}\n`;
+      // Ingen "Færdig ✅" ved succes – kun vis fejl, hvis der er nogen
       if (failed.length) {
-        msg += `\nDisse adresser kunne ikke geokodes (ret dem manuelt):\n`;
+        let msg = `Disse adresser kunne ikke geokodes (ret dem manuelt):\n`;
         for (const f of failed) {
           msg += `- ${f.name}: ${f.address} (${f.error})\n`;
         }
+        setStatus(msg);
+      } else {
+        setStatus('');
       }
-      setStatus(msg);
     }
 
     // ----------------- Init -----------------
@@ -1268,7 +1262,7 @@ function markerPopupHtml(e) {
     bulkOpacityNumber.value = String(defaultOpacity);
 
     // seed hvis tom
-    const didSeed = seedDefaultValgstederIfEmpty();
+    seedDefaultValgstederIfEmpty();
 
     // recreate markers for stored coords
     for (const e of entries) {
@@ -1285,7 +1279,7 @@ function markerPopupHtml(e) {
     addCphRing2Overlay();
     initResizer();
 
-    // hvis seeded eller der mangler coords -> geocode
+    // geocode (kun hvis mangler coords)
     geocodeAllMissing();
 
     // bind
