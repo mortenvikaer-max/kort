@@ -52,7 +52,6 @@
     .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     .status { margin-top: 10px; font-size: 12px; color:#333; white-space: pre-wrap; }
 
-    /* Prevent overflow */
     table { width: 100%; border-collapse: collapse; table-layout: fixed; }
     th, td {
       text-align: left; font-size: 12px; padding: 8px 6px;
@@ -61,7 +60,6 @@
     }
     th { color:#666; font-weight: 600; }
 
-    /* IMPORTANT: wrap actions so they never overflow */
     .actions { display:flex; gap:6px; flex-wrap: wrap; align-items:center; }
     .mini {
       padding: 6px 8px;
@@ -116,7 +114,6 @@
       .filterGrid { grid-template-columns: repeat(1, minmax(0, 1fr)); }
     }
 
-    /* Tabs */
     .tabs {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -211,7 +208,6 @@
             <span class="summaryRight" id="bulkSummary"></span>
           </summary>
 
-          <!-- Segmentering: alle eller én farve -->
           <label for="bulkTargetColor" style="margin-top:10px;">Gælder for (farve)</label>
           <select id="bulkTargetColor"></select>
           <div class="hint" id="bulkTargetHint"></div>
@@ -253,19 +249,17 @@
   <script>
     // ----------------- Konfiguration -----------------
     const PER_REQUEST_DELAY_MS = 80;
-    const LIMIT_TO_CPH = true; // geokodning begrænses i baggrunden til kommunekode 0101
+    const LIMIT_TO_CPH = true;
 
-    // UI
     const UI_KEY = "valgsteder_ui_sidebar_v1";
 
-    // Datasæt keys (hver fane gemmes separat)
     const STORAGE_KEYS = {
       valg: "valgsteder_state_v6",
       brev: "brevsteder_state_v1"
     };
     const SEED_KEYS = {
       valg: "valgsteder_seed_v2",
-      brev: "brevsteder_seed_v1"
+      brev: "brevsteder_seed_v2" // bumpet, så nye standard-brevsteder seed'es
     };
 
     const NEIGHBOR_STYLE = { color: "#2f2f2f", weight: 1, fillColor: "#2f2f2f", fillOpacity: 0.35 };
@@ -282,7 +276,6 @@
     ];
     const COLOR_LABEL_BY_VALUE = Object.fromEntries(COLOR_PRESETS.map(c => [c.value, c.label]));
 
-    // Kreds/kategorier
     const KREDS_OPTIONS = [
       ...Array.from({ length: 9 }, (_, i) => ({ key: String(i + 1), label: `${i + 1}. kreds` })),
       { key: "new",    label: "Nyt sted" },
@@ -290,9 +283,8 @@
     ];
     const KREDS_LABEL_BY_KEY = Object.fromEntries(KREDS_OPTIONS.map(o => [o.key, o.label]));
 
-    // --------- FORUDINDSATTE VALGSTEDER (kun Valgsteder-fanen) ---------
+    // --------- FORUDINDSATTE VALGSTEDER (kun Valgsteder) ---------
     const DEFAULT_VALGSTEDER = [
-      // 1. kreds
       { kredsKey:"1", name:"1. Nord. Strandvejsskolen", address:"Sionsgade 1" },
       { kredsKey:"1", name:"1. Nordhavn. Østerbrohuset", address:"Århusgade 103" },
       { kredsKey:"1", name:"1. Nordvest. Kildevældskolen", address:"Bellmansgade 5A" },
@@ -301,7 +293,6 @@
       { kredsKey:"1", name:"1. Øst. Skolen På Strandboulevarden", address:"Strandboulevarden 47" },
       { kredsKey:"1", name:"1. Østerbro. Idrætshuset", address:"Gunnar Nu Hansens Plads 7" },
 
-      // 2. kreds
       { kredsKey:"2", name:"2. Kalvebod Fælled", address:"Else Alfelts Vej 2" },
       { kredsKey:"2", name:"2. Nord. Amager Fælled Skole", address:"Sundholmsvej 2A" },
       { kredsKey:"2", name:"2. Peder Lykke. Peder Lykke Skolen", address:"Birketinget 3" },
@@ -310,7 +301,6 @@
       { kredsKey:"2", name:"2. Vest. Skolen På Islands Brygge", address:"Artillerivej 57" },
       { kredsKey:"2", name:"2. Øst. Dyvekeskolen", address:"Remisevej 16" },
 
-      // 3. kreds
       { kredsKey:"3", name:"3. Indre By. Rådhushallen", address:"Rådhuspladsen 1" },
       { kredsKey:"3", name:"3. Midt. Den Classenske Legatskole", address:"Vester Voldgade 98" },
       { kredsKey:"3", name:"3. Nord. Øster Farimagsgade Skole", address:"Øster Farimagsgade 40" },
@@ -318,14 +308,12 @@
       { kredsKey:"3", name:"3. Sølvgade. Sølvgades Skole", address:"Sølvgade 16" },
       { kredsKey:"3", name:"3. Øst. Nyboder Skole", address:"Øster Voldgade 15" },
 
-      // 4. kreds
       { kredsKey:"4", name:"4. Nord. Skolen På Amagerbro", address:"Lybækgade 20" },
       { kredsKey:"4", name:"4. Nordøst. Nordøstamager Skole", address:"Holmbladsgade 117" },
       { kredsKey:"4", name:"4. Sundbyøster. Lergravsparkens Skole", address:"Wittenberggade 2" },
       { kredsKey:"4", name:"4. Syd. Gerbrandskolen", address:"Gerbrandsvej 9" },
       { kredsKey:"4", name:"4. Øst. Skolen Ved Sundet", address:"Samosvej 50" },
 
-      // 5. kreds
       { kredsKey:"5", name:"5. Nord. Rådmandsgades Skole", address:"Rådmandsgade 22" },
       { kredsKey:"5", name:"5. Nordvest. Frederiksgård Skole", address:"Ørholmgade 8" },
       { kredsKey:"5", name:"5. Nørrebro. Guldberg Skole", address:"Sjællandsgade 10" },
@@ -334,14 +322,12 @@
       { kredsKey:"5", name:"5. Vest. Nørrebro Park Skole", address:"Jagtvej 34" },
       { kredsKey:"5", name:"5. Øst. Plejecentret Sølund", address:"Ryesgade 20A" },
 
-      // 6. kreds
       { kredsKey:"6", name:"6. Bispebjerg. Tagensbo Skole", address:"Hovmestervej 19" },
       { kredsKey:"6", name:"6. Nord. Holbergskolen", address:"Frederiksborgvej 216" },
       { kredsKey:"6", name:"6. Syd. Grøndalsvængets Skole", address:"Rørsangervej 29" },
       { kredsKey:"6", name:"6. Vest. Utterslev Skole", address:"Skoleholdervej 20" },
       { kredsKey:"6", name:"6. Øst. Lundehusskolen", address:"Lersø Parkallé 152" },
 
-      // 7. kreds
       { kredsKey:"7", name:"7. Kirkebjerg. Kirkebjerg Skole", address:"Vanløsehøj 4" },
       { kredsKey:"7", name:"7. Nord. Tingbjerg Skole", address:"Skolesiden 2" },
       { kredsKey:"7", name:"7. Nordvest. Husum Skole", address:"Karlslundevej 23" },
@@ -350,7 +336,6 @@
       { kredsKey:"7", name:"7. Vest. Energicenter Voldparken", address:"Kobbelvænget 65" },
       { kredsKey:"7", name:"7. Øst. Bellahøj Skole", address:"Svenskelejren 18" },
 
-      // 8. kreds
       { kredsKey:"8", name:"8. Midt. Vigerslev Allés Skole", address:"Vigerslev Allé 108" },
       { kredsKey:"8", name:"8. Nord. Prøvehallen", address:"Porcelænstorvet 4" },
       { kredsKey:"8", name:"8. Syd. Kirsebærhavens Skole", address:"Kirsebærhaven 23" },
@@ -358,7 +343,6 @@
       { kredsKey:"8", name:"8. Valby. Ålholm Skole", address:"Vibeholmen 1" },
       { kredsKey:"8", name:"8. Vest. Lykkebo Hallen", address:"Lykkebovej 30" },
 
-      // 9. kreds
       { kredsKey:"9", name:"9. Midt. Bavnehøjhallen", address:"Enghavevej 90" },
       { kredsKey:"9", name:"9. Nord. Oehlenschlægersgades Skole", address:"Oehlenschlægersgade 57" },
       { kredsKey:"9", name:"9. Sluseholmen. Sluseholmen Skole", address:"Ved Stigbordene 26" },
@@ -367,6 +351,30 @@
       { kredsKey:"9", name:"9. Vest. Vesterbro Ny Skole", address:"Slesvigsgade 6" },
       { kredsKey:"9", name:"9. Vesterbro. Tove Ditlevsens Skole", address:"Enghave Plads 21" },
       { kredsKey:"9", name:"9. Øst. Skolen Ved Dybbølsbro", address:"Kødboderne 8" },
+    ];
+
+    // --------- FORUDINDSATTE BREVSTEMMESTEDER (kun Brev-fanen) ---------
+    const DEFAULT_BREVSTEDER = [
+      { kredsKey:"1", name:"Østerbro Bibliotek", address:"Dag Hammarskjölds Allé 19, 2100 København Ø" },
+
+      { kredsKey:"2", name:"Solvang Bibliotek", address:"Remisevej 14, 2300 København S" },
+      { kredsKey:"2", name:"Ørestad Bibliotek", address:"Arne Jacobsens Allé 19, 2300 København S" },
+
+      { kredsKey:"3", name:"Borgerservice Vesterbro", address:"Nyropsgade 7, 1602 København V" },
+      { kredsKey:"3", name:"Hovedbiblioteket", address:"Krystalgade 15, 1172 København K" },
+
+      { kredsKey:"4", name:"Kvarterhuset Sundby", address:"Jemtelandsgade 3, 2300 København S" },
+
+      { kredsKey:"5", name:"Nørrebro Bibliotek", address:"Nørrebrogade 208, 2200 København N" },
+
+      { kredsKey:"6", name:"Rentemestervej Bibliotek", address:"Rentemestervej 76, 2400 København NV" },
+
+      { kredsKey:"7", name:"Kulturstationen Vanløse", address:"Jernbane Allé 38, 2720 Vanløse" },
+      { kredsKey:"7", name:"Tingbjerg Bibliotek", address:"Skolesiden 4, 2700 Brønshøj" },
+
+      { kredsKey:"8", name:"Borgerservice Valby", address:"Gammel Køge Landevej 43, 2500 Valby" },
+
+      { kredsKey:"9", name:"Vesterbro Bibliotek og Kulturhus", address:"Lyrskovgade 4, 1758 København V" },
     ];
 
     const DEFAULT_SEED_STYLE = { color: "#e11d48", radius: 6 };
@@ -378,24 +386,20 @@
       attribution: '&copy; OpenStreetMap'
     }).addTo(map);
 
-    // Naboer (grå) under markører
     map.createPane('neighborsPane');
     map.getPane('neighborsPane').style.zIndex = 430;
     map.getPane('neighborsPane').style.pointerEvents = 'none';
 
-    // København-outline (rød) under markører
     map.createPane('cphOutlinePane');
     map.getPane('cphOutlinePane').style.zIndex = 440;
     map.getPane('cphOutlinePane').style.pointerEvents = 'none';
 
-    // Markører øverst og klikbare
     map.createPane('markersPane');
     map.getPane('markersPane').style.zIndex = 650;
     map.getPane('markersPane').style.pointerEvents = 'auto';
 
-    // Separat layerGroup pr. fane (så vi kan skifte “kort” via faner)
     const groupValg = L.layerGroup().addTo(map);
-    const groupBrev = L.layerGroup(); // først tilføjet når fanen vælges
+    const groupBrev = L.layerGroup();
 
     // ----------------- Utils -----------------
     function escapeHtml(str) {
@@ -557,7 +561,7 @@
           if (code === start) continue;
           if (d === 1 || d === 2) grayCodes.add(code);
         }
-        grayCodes.add("0147"); // Frederiksberg
+        grayCodes.add("0147");
 
         const grayFeatures = [];
         for (const code of grayCodes) {
@@ -583,7 +587,7 @@
       }
     }
 
-    // ----------------- Datasæt (faner) -----------------
+    // ----------------- Datasæt -----------------
     function createDataset(id, layerGroup) {
       return {
         id,
@@ -642,7 +646,6 @@
         }).bindPopup(markerPopupHtml(e));
 
         m.on('click', () => m.openPopup());
-
         ds.markerById.set(e.id, m);
       }
       return m || null;
@@ -658,9 +661,7 @@
       m.bindPopup(markerPopupHtml(e));
     }
 
-    function isEntryVisible(ds, e) {
-      return ds.selectedKredse.has(e.kredsKey);
-    }
+    function isEntryVisible(ds, e) { return ds.selectedKredse.has(e.kredsKey); }
 
     function updateVisibility(ds) {
       for (const e of ds.entries) {
@@ -738,7 +739,7 @@
       try { localStorage.removeItem(SEED_KEYS[ds.id]); } catch {}
     }
 
-    // ----------------- Seed (kun Valgsteder) -----------------
+    // ----------------- Seed -----------------
     function hasSeeded(ds) {
       try { return localStorage.getItem(SEED_KEYS[ds.id]) === "1"; } catch { return false; }
     }
@@ -746,12 +747,15 @@
       try { localStorage.setItem(SEED_KEYS[ds.id], "1"); } catch {}
     }
 
-    function seedDefaultIfNeeded(ds) {
-      if (ds.id !== "valg") return false;
+    function seedDefaultsIfNeeded(ds) {
       if (ds.entries.length > 0) return false;
       if (hasSeeded(ds)) return false;
 
-      for (const v of DEFAULT_VALGSTEDER) {
+      const source = (ds.id === "valg") ? DEFAULT_VALGSTEDER
+                   : (ds.id === "brev") ? DEFAULT_BREVSTEDER
+                   : [];
+
+      for (const v of source) {
         ds.entries.push({
           id: uuid(),
           kredsKey: v.kredsKey,
@@ -764,6 +768,7 @@
           lng: undefined
         });
       }
+
       markSeeded(ds);
       saveState(ds);
       return true;
@@ -809,7 +814,6 @@
       renderKredsLists(ds);
       updateVisibility(ds);
 
-      // Vis kun fejl
       if (failed.length) {
         let msg = `Disse adresser kunne ikke geokodes (ret dem manuelt):\n`;
         for (const f of failed) msg += `- ${f.name}: ${f.address} (${f.error})\n`;
@@ -1015,7 +1019,6 @@
         }
       }
 
-      // bind delete (kun i redigér) + confirm
       container.querySelectorAll('button[data-del]').forEach(btn => {
         btn.addEventListener('click', () => {
           if (!confirm("Er du sikker på, at du vil slette dette sted?")) return;
@@ -1333,34 +1336,28 @@
     function setActiveTab(id) {
       if (id === activeId) return;
 
-      // skift knap-styling
       document.getElementById('tabValg').classList.toggle('active', id === "valg");
       document.getElementById('tabBrev').classList.toggle('active', id === "brev");
 
-      // fjern nuværende gruppe fra kortet
       const prev = active();
       if (map.hasLayer(prev.layerGroup)) map.removeLayer(prev.layerGroup);
 
       activeId = id;
 
-      // sørg for state loaded
       const ds = active();
       loadState(ds);
 
-      // seed kun på valg
-      seedDefaultIfNeeded(ds);
+      // seed standarder hvis tom
+      seedDefaultsIfNeeded(ds);
 
-      // add gruppe
       if (!map.hasLayer(ds.layerGroup)) ds.layerGroup.addTo(map);
 
-      // sørg for markører oprettet hvis coords findes
       for (const e of ds.entries) {
         if (typeof e.opacity !== "number") e.opacity = ds.defaultOpacity;
         ensureMarker(ds, e);
         updateMarkerStyleAndPopup(ds, e);
       }
 
-      // UI
       applyTabText();
       refreshStatus();
 
@@ -1372,9 +1369,7 @@
       updateVisibility(ds);
       updateSummaries(ds);
 
-      // geocode hvis mangler coords
       geocodeAllMissing(ds);
-
       requestAnimationFrame(() => map.invalidateSize());
     }
 
@@ -1387,14 +1382,13 @@
     loadSidebarWidth();
     initResizer();
 
-    // load begge datasæt (så tab-skift er hurtigt)
     loadState(datasets.valg);
     loadState(datasets.brev);
 
-    // seed valgsteder hvis tom
-    seedDefaultIfNeeded(datasets.valg);
+    // seed begge faner hvis tomme
+    seedDefaultsIfNeeded(datasets.valg);
+    seedDefaultsIfNeeded(datasets.brev);
 
-    // opret markører for begge datasæt (kun dem med coords)
     for (const ds of [datasets.valg, datasets.brev]) {
       for (const e of ds.entries) {
         if (typeof e.opacity !== "number") e.opacity = ds.defaultOpacity;
@@ -1403,7 +1397,6 @@
       }
     }
 
-    // start på Valgsteder
     applyTabText();
     bulkOpacityRange.value = String(datasets.valg.defaultOpacity);
     bulkOpacityNumber.value = String(datasets.valg.defaultOpacity);
@@ -1416,13 +1409,10 @@
 
     addCphRing2Overlay();
 
-    // geocode manglende coords (valg + brev)
     geocodeAllMissing(datasets.valg);
     geocodeAllMissing(datasets.brev);
 
-    // bind
     document.getElementById('add').addEventListener('click', addEntry);
-
     document.getElementById('applyBulkRadius').addEventListener('click', applyBulkRadius);
     document.getElementById('applyBulkColor').addEventListener('click', applyBulkColor);
 
@@ -1430,7 +1420,6 @@
     document.getElementById('kredsNone').addEventListener('click', () => setAllKredse(active(), false));
 
     document.getElementById('bulkTargetColor').addEventListener('change', () => updateBulkTargetHint(active()));
-
     bulkOpacityRange.addEventListener('input', () => syncBulkOpacityFrom(bulkOpacityRange));
     bulkOpacityNumber.addEventListener('input', () => syncBulkOpacityFrom(bulkOpacityNumber));
 
@@ -1447,7 +1436,6 @@
 
       clearStorage(ds);
 
-      // fjern markører
       for (const m of ds.markerById.values()) {
         if (ds.layerGroup.hasLayer(m)) ds.layerGroup.removeLayer(m);
         m.remove();
@@ -1469,10 +1457,8 @@
       refreshStatus();
     });
 
-    // tabs
     document.getElementById('tabValg').addEventListener('click', () => setActiveTab("valg"));
     document.getElementById('tabBrev').addEventListener('click', () => setActiveTab("brev"));
-
   </script>
 </body>
 </html>
