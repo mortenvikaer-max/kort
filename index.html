@@ -115,13 +115,39 @@
     @media (max-width: 420px) {
       .filterGrid { grid-template-columns: repeat(1, minmax(0, 1fr)); }
     }
+
+    /* Tabs */
+    .tabs {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin: 0 0 12px;
+    }
+    .tabBtn {
+      margin-top: 0;
+      border-radius: 12px;
+      padding: 10px;
+      font-weight: 600;
+      background: #fff;
+    }
+    .tabBtn.active {
+      background: #111;
+      color: #fff;
+      border-color:#111;
+    }
   </style>
 </head>
 
 <body>
   <div class="wrap">
     <div class="panel">
-      <h2>Tilføj valgsteder</h2>
+
+      <div class="tabs">
+        <button id="tabValg" class="tabBtn active" type="button">Valgsteder</button>
+        <button id="tabBrev" class="tabBtn" type="button">Brevstemmesteder</button>
+      </div>
+
+      <h2 id="pageTitle">Tilføj valgsteder</h2>
 
       <label for="kreds">Kreds</label>
       <select id="kreds"></select>
@@ -171,7 +197,7 @@
       <div class="section">
         <details open>
           <summary>
-            Valgsteder fordelt på kreds
+            <span id="listTitle">Valgsteder fordelt på kreds</span>
             <span class="summaryRight" id="listSummary"></span>
           </summary>
           <div id="kredsLists"></div>
@@ -181,7 +207,7 @@
       <div class="section">
         <details>
           <summary>
-            Ændringer for alle valgsteder
+            <span id="bulkTitle">Ændringer for alle valgsteder</span>
             <span class="summaryRight" id="bulkSummary"></span>
           </summary>
 
@@ -211,8 +237,8 @@
           </div>
           <div class="hint">Opacity gemmes automatisk. (Gælder for den valgte farve – eller alle farver).</div>
 
-          <button id="clearAllStorage" class="mini" type="button" style="margin-top:12px;">Slet alle gemte valgsteder</button>
-          <div class="hint">Dette fjerner alt gemt i browseren (localStorage).</div>
+          <button id="clearAllStorage" class="mini" type="button" style="margin-top:12px;">Slet alle gemte steder</button>
+          <div class="hint">Dette fjerner alt gemt i browseren (localStorage) for den valgte fane.</div>
         </details>
       </div>
 
@@ -229,10 +255,18 @@
     const PER_REQUEST_DELAY_MS = 80;
     const LIMIT_TO_CPH = true; // geokodning begrænses i baggrunden til kommunekode 0101
 
-    // Bump keys, så gamle localStorage-data ikke “overlever” deploys ved en fejl
-    const STORAGE_KEY = "valgsteder_state_v6";
+    // UI
     const UI_KEY = "valgsteder_ui_sidebar_v1";
-    const SEED_KEY = "valgsteder_seed_v2";
+
+    // Datasæt keys (hver fane gemmes separat)
+    const STORAGE_KEYS = {
+      valg: "valgsteder_state_v6",
+      brev: "brevsteder_state_v1"
+    };
+    const SEED_KEYS = {
+      valg: "valgsteder_seed_v2",
+      brev: "brevsteder_seed_v1"
+    };
 
     const NEIGHBOR_STYLE = { color: "#2f2f2f", weight: 1, fillColor: "#2f2f2f", fillOpacity: 0.35 };
     const CPH_OUTLINE_STYLE = { color: "#e11d48", weight: 1, fillOpacity: 0 };
@@ -251,12 +285,12 @@
     // Kreds/kategorier
     const KREDS_OPTIONS = [
       ...Array.from({ length: 9 }, (_, i) => ({ key: String(i + 1), label: `${i + 1}. kreds` })),
-      { key: "new",    label: "Nyt valgsted" },
-      { key: "closed", label: "Nedlagt valgsted" }
+      { key: "new",    label: "Nyt sted" },
+      { key: "closed", label: "Nedlagt sted" }
     ];
     const KREDS_LABEL_BY_KEY = Object.fromEntries(KREDS_OPTIONS.map(o => [o.key, o.label]));
 
-    // --------- FORUDINDSATTE VALGSTEDER ---------
+    // --------- FORUDINDSATTE VALGSTEDER (kun Valgsteder-fanen) ---------
     const DEFAULT_VALGSTEDER = [
       // 1. kreds
       { kredsKey:"1", name:"1. Nord. Strandvejsskolen", address:"Sionsgade 1" },
@@ -284,14 +318,14 @@
       { kredsKey:"3", name:"3. Sølvgade. Sølvgades Skole", address:"Sølvgade 16" },
       { kredsKey:"3", name:"3. Øst. Nyboder Skole", address:"Øster Voldgade 15" },
 
-      // 4. kreds, Sundbyøster
+      // 4. kreds
       { kredsKey:"4", name:"4. Nord. Skolen På Amagerbro", address:"Lybækgade 20" },
       { kredsKey:"4", name:"4. Nordøst. Nordøstamager Skole", address:"Holmbladsgade 117" },
       { kredsKey:"4", name:"4. Sundbyøster. Lergravsparkens Skole", address:"Wittenberggade 2" },
       { kredsKey:"4", name:"4. Syd. Gerbrandskolen", address:"Gerbrandsvej 9" },
       { kredsKey:"4", name:"4. Øst. Skolen Ved Sundet", address:"Samosvej 50" },
 
-      // 5. kreds, Nørrebro
+      // 5. kreds
       { kredsKey:"5", name:"5. Nord. Rådmandsgades Skole", address:"Rådmandsgade 22" },
       { kredsKey:"5", name:"5. Nordvest. Frederiksgård Skole", address:"Ørholmgade 8" },
       { kredsKey:"5", name:"5. Nørrebro. Guldberg Skole", address:"Sjællandsgade 10" },
@@ -300,14 +334,14 @@
       { kredsKey:"5", name:"5. Vest. Nørrebro Park Skole", address:"Jagtvej 34" },
       { kredsKey:"5", name:"5. Øst. Plejecentret Sølund", address:"Ryesgade 20A" },
 
-      // 6. kreds, Bispebjerg
+      // 6. kreds
       { kredsKey:"6", name:"6. Bispebjerg. Tagensbo Skole", address:"Hovmestervej 19" },
       { kredsKey:"6", name:"6. Nord. Holbergskolen", address:"Frederiksborgvej 216" },
       { kredsKey:"6", name:"6. Syd. Grøndalsvængets Skole", address:"Rørsangervej 29" },
       { kredsKey:"6", name:"6. Vest. Utterslev Skole", address:"Skoleholdervej 20" },
       { kredsKey:"6", name:"6. Øst. Lundehusskolen", address:"Lersø Parkallé 152" },
 
-      // 7. kreds, Brønshøj
+      // 7. kreds
       { kredsKey:"7", name:"7. Kirkebjerg. Kirkebjerg Skole", address:"Vanløsehøj 4" },
       { kredsKey:"7", name:"7. Nord. Tingbjerg Skole", address:"Skolesiden 2" },
       { kredsKey:"7", name:"7. Nordvest. Husum Skole", address:"Karlslundevej 23" },
@@ -316,7 +350,7 @@
       { kredsKey:"7", name:"7. Vest. Energicenter Voldparken", address:"Kobbelvænget 65" },
       { kredsKey:"7", name:"7. Øst. Bellahøj Skole", address:"Svenskelejren 18" },
 
-      // 8. kreds, Valby
+      // 8. kreds
       { kredsKey:"8", name:"8. Midt. Vigerslev Allés Skole", address:"Vigerslev Allé 108" },
       { kredsKey:"8", name:"8. Nord. Prøvehallen", address:"Porcelænstorvet 4" },
       { kredsKey:"8", name:"8. Syd. Kirsebærhavens Skole", address:"Kirsebærhaven 23" },
@@ -324,7 +358,7 @@
       { kredsKey:"8", name:"8. Valby. Ålholm Skole", address:"Vibeholmen 1" },
       { kredsKey:"8", name:"8. Vest. Lykkebo Hallen", address:"Lykkebovej 30" },
 
-      // 9. kreds, Vesterbro
+      // 9. kreds
       { kredsKey:"9", name:"9. Midt. Bavnehøjhallen", address:"Enghavevej 90" },
       { kredsKey:"9", name:"9. Nord. Oehlenschlægersgades Skole", address:"Oehlenschlægersgade 57" },
       { kredsKey:"9", name:"9. Sluseholmen. Sluseholmen Skole", address:"Ved Stigbordene 26" },
@@ -335,10 +369,7 @@
       { kredsKey:"9", name:"9. Øst. Skolen Ved Dybbølsbro", address:"Kødboderne 8" },
     ];
 
-    const DEFAULT_SEED_STYLE = {
-      color: "#e11d48",
-      radius: 6
-    };
+    const DEFAULT_SEED_STYLE = { color: "#e11d48", radius: 6 };
 
     // ----------------- Kort -----------------
     const map = L.map('map').setView([55.6761, 12.5683], 12);
@@ -362,43 +393,27 @@
     map.getPane('markersPane').style.zIndex = 650;
     map.getPane('markersPane').style.pointerEvents = 'auto';
 
-    const markerGroup = L.layerGroup().addTo(map);
+    // Separat layerGroup pr. fane (så vi kan skifte “kort” via faner)
+    const groupValg = L.layerGroup().addTo(map);
+    const groupBrev = L.layerGroup(); // først tilføjet når fanen vælges
 
-    // ----------------- State -----------------
-    // entry: {id, kredsKey, name, address, color, radius, opacity, lat, lng}
-    const entries = [];
-    const selectedKredse = new Set(KREDS_OPTIONS.map(o => o.key));
-
-    // default opacity for nye punkter
-    let defaultOpacity = 0.55;
-
-    const markerById = new Map();
-    const editingIds = new Set();
-    const backups = new Map();
-
-    // ----------------- Helpers -----------------
-    const statusEl = document.getElementById('status');
-    function setStatus(msg) { statusEl.textContent = msg || ''; }
-
+    // ----------------- Utils -----------------
     function escapeHtml(str) {
       return String(str ?? '').replace(/[&<>"']/g, (m) => ({
         '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'
       }[m]));
     }
-
     function uuid() {
       return (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random());
     }
-
     function clampRadius(v) {
       const n = Number(v);
       if (!Number.isFinite(n)) return 12;
       return Math.max(2, Math.min(20, Math.round(n)));
     }
-
-    function clampOpacity(v) {
+    function clampOpacity(v, fallback) {
       const n = Number(v);
-      if (!Number.isFinite(n)) return defaultOpacity;
+      if (!Number.isFinite(n)) return fallback;
       return Math.max(0, Math.min(1, Math.round(n * 20) / 20));
     }
 
@@ -411,26 +426,6 @@
         selectEl.appendChild(opt);
       }
       selectEl.value = defaultValue || COLOR_PRESETS[0].value;
-    }
-
-    function populateBulkTargetColor() {
-      const sel = document.getElementById('bulkTargetColor');
-      sel.innerHTML = '';
-
-      const all = document.createElement('option');
-      all.value = "__all__";
-      all.textContent = "Alle farver";
-      sel.appendChild(all);
-
-      for (const c of COLOR_PRESETS) {
-        const opt = document.createElement('option');
-        opt.value = c.value;
-        opt.textContent = c.label;
-        sel.appendChild(opt);
-      }
-      sel.value = "__all__";
-      updateBulkTargetHint();
-      updateBulkSummary();
     }
 
     function populateKredsSelect(selectEl, defaultKey) {
@@ -449,87 +444,38 @@
       selectEl.value = defaultKey ?? '';
     }
 
-    function isEntryVisible(e) {
-      return selectedKredse.has(e.kredsKey);
-    }
+    // ----------------- DAWA geokodning -----------------
+    async function geocodeDAWA(address) {
+      const params = new URLSearchParams();
+      params.set('q', address);
+      params.set('format', 'geojson');
+      params.set('struktur', 'mini');
+      params.set('srid', '4326');
+      if (LIMIT_TO_CPH) params.set('kommunekode', '0101');
 
-    function markerPopupHtml(e) {
-      return `
-        <div style="line-height:1.3">
-          <b>${escapeHtml(e.name || '(uden navn)')}</b><br/>
-          ${escapeHtml(e.address || '')}
-        </div>
-      `;
-    }
+      const urls = [
+        `https://api.dataforsyningen.dk/adresser?${params.toString()}`,
+        `https://dawa.aws.dk/adresser?${params.toString()}`
+      ];
 
-    function ensureMarker(e) {
-      let m = markerById.get(e.id);
-      const op = (typeof e.opacity === "number") ? e.opacity : defaultOpacity;
-
-      if (!m && Number.isFinite(e.lat) && Number.isFinite(e.lng)) {
-        m = L.circleMarker([e.lat, e.lng], {
-          pane: 'markersPane',
-          radius: e.radius,
-          color: e.color,
-          fillColor: e.color,
-          fillOpacity: op,
-          weight: 1,
-          interactive: true
-        }).bindPopup(markerPopupHtml(e));
-
-        // Robust: åbn popup ved klik
-        m.on('click', () => m.openPopup());
-
-        markerById.set(e.id, m);
-      }
-      return m || null;
-    }
-
-    function updateMarkerStyleAndPopup(e) {
-      const m = markerById.get(e.id);
-      if (!m) return;
-
-      const op = (typeof e.opacity === "number") ? e.opacity : defaultOpacity;
-      m.setStyle({ color: e.color, fillColor: e.color, fillOpacity: op, weight: 1 });
-      m.setRadius(e.radius);
-      m.bindPopup(markerPopupHtml(e));
-    }
-
-    function updateVisibility() {
-      for (const e of entries) {
-        const m = ensureMarker(e);
-        if (!m) continue;
-        if (isEntryVisible(e)) {
-          if (!markerGroup.hasLayer(m)) markerGroup.addLayer(m);
-        } else {
-          if (markerGroup.hasLayer(m)) markerGroup.removeLayer(m);
+      let lastErr = null;
+      for (const url of urls) {
+        try {
+          const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const geo = await res.json();
+          const feat = geo && geo.features && geo.features[0];
+          if (!feat) return null;
+          const [lng, lat] = feat.geometry.coordinates;
+          return { lat, lng };
+        } catch (e) {
+          lastErr = e;
         }
       }
-      updateSummaries();
+      throw lastErr || new Error('Geokodning fejlede');
     }
 
-    // ----------------- Bulk targeting by color -----------------
-    function getBulkTargets() {
-      const target = document.getElementById('bulkTargetColor').value;
-      if (target === "__all__") return entries.slice();
-      return entries.filter(e => e.color === target);
-    }
-
-    function updateBulkTargetHint() {
-      const target = document.getElementById('bulkTargetColor').value;
-      const hintEl = document.getElementById('bulkTargetHint');
-      if (target === "__all__") hintEl.textContent = "Ændringerne påvirker alle farver.";
-      else hintEl.textContent = `Ændringerne påvirker kun "${COLOR_LABEL_BY_VALUE[target] || target}".`;
-      updateBulkSummary();
-    }
-
-    function updateBulkSummary() {
-      const total = entries.length;
-      const count = getBulkTargets().length;
-      document.getElementById('bulkSummary').textContent = total ? `${count}/${total}` : '';
-    }
-
-    // ----------------- Kommuner overlay (ring 1 + ring 2) -----------------
+    // ----------------- Kommune-overlay -----------------
     function collectRoundedCoordKeys(geometry, decimals = 6) {
       const out = [];
       const round = (x) => Number(x).toFixed(decimals);
@@ -637,52 +583,149 @@
       }
     }
 
+    // ----------------- Datasæt (faner) -----------------
+    function createDataset(id, layerGroup) {
+      return {
+        id,
+        layerGroup,
+        entries: [],
+        selectedKredse: new Set(KREDS_OPTIONS.map(o => o.key)),
+        defaultOpacity: 0.55,
+        markerById: new Map(),
+        editingIds: new Set(),
+        backups: new Map(),
+        statusMsg: "",
+        loaded: false,
+        geocoding: false
+      };
+    }
+
+    const datasets = {
+      valg: createDataset("valg", groupValg),
+      brev: createDataset("brev", groupBrev)
+    };
+
+    let activeId = "valg";
+    function active() { return datasets[activeId]; }
+
+    const statusEl = document.getElementById('status');
+    function setStatus(msg) {
+      active().statusMsg = msg || "";
+      statusEl.textContent = active().statusMsg;
+    }
+    function refreshStatus() {
+      statusEl.textContent = active().statusMsg || "";
+    }
+
+    function markerPopupHtml(e) {
+      return `
+        <div style="line-height:1.3">
+          <b>${escapeHtml(e.name || '(uden navn)')}</b><br/>
+          ${escapeHtml(e.address || '')}
+        </div>
+      `;
+    }
+
+    function ensureMarker(ds, e) {
+      let m = ds.markerById.get(e.id);
+      const op = (typeof e.opacity === "number") ? e.opacity : ds.defaultOpacity;
+
+      if (!m && Number.isFinite(e.lat) && Number.isFinite(e.lng)) {
+        m = L.circleMarker([e.lat, e.lng], {
+          pane: 'markersPane',
+          radius: e.radius,
+          color: e.color,
+          fillColor: e.color,
+          fillOpacity: op,
+          weight: 1,
+          interactive: true
+        }).bindPopup(markerPopupHtml(e));
+
+        m.on('click', () => m.openPopup());
+
+        ds.markerById.set(e.id, m);
+      }
+      return m || null;
+    }
+
+    function updateMarkerStyleAndPopup(ds, e) {
+      const m = ds.markerById.get(e.id);
+      if (!m) return;
+
+      const op = (typeof e.opacity === "number") ? e.opacity : ds.defaultOpacity;
+      m.setStyle({ color: e.color, fillColor: e.color, fillOpacity: op, weight: 1 });
+      m.setRadius(e.radius);
+      m.bindPopup(markerPopupHtml(e));
+    }
+
+    function isEntryVisible(ds, e) {
+      return ds.selectedKredse.has(e.kredsKey);
+    }
+
+    function updateVisibility(ds) {
+      for (const e of ds.entries) {
+        const m = ensureMarker(ds, e);
+        if (!m) continue;
+
+        const vis = isEntryVisible(ds, e);
+        if (vis) {
+          if (!ds.layerGroup.hasLayer(m)) ds.layerGroup.addLayer(m);
+        } else {
+          if (ds.layerGroup.hasLayer(m)) ds.layerGroup.removeLayer(m);
+        }
+      }
+      updateSummaries(ds);
+    }
+
     // ----------------- Persistence -----------------
-    function saveState() {
+    function saveState(ds) {
       const state = {
-        version: 6,
-        defaultOpacity,
-        selectedKredse: [...selectedKredse],
-        entries: entries.map(e => ({
+        version: 1,
+        defaultOpacity: ds.defaultOpacity,
+        selectedKredse: [...ds.selectedKredse],
+        entries: ds.entries.map(e => ({
           id: e.id,
           kredsKey: e.kredsKey,
           name: e.name,
           address: e.address,
           color: e.color,
           radius: e.radius,
-          opacity: (typeof e.opacity === "number") ? e.opacity : defaultOpacity,
+          opacity: (typeof e.opacity === "number") ? e.opacity : ds.defaultOpacity,
           lat: e.lat,
           lng: e.lng
         }))
       };
-      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch {}
-      updateBulkSummary();
+      try { localStorage.setItem(STORAGE_KEYS[ds.id], JSON.stringify(state)); } catch {}
+      updateBulkSummary(ds);
     }
 
-    function loadState() {
+    function loadState(ds) {
+      if (ds.loaded) return;
+      ds.loaded = true;
+
       try {
-        const raw = localStorage.getItem(STORAGE_KEY);
+        const raw = localStorage.getItem(STORAGE_KEYS[ds.id]);
         if (!raw) return;
         const s = JSON.parse(raw);
         if (!s || !Array.isArray(s.entries)) return;
 
-        defaultOpacity = clampOpacity(s.defaultOpacity ?? s.opacity ?? 0.55);
+        ds.defaultOpacity = clampOpacity(s.defaultOpacity ?? 0.55, 0.55);
 
-        selectedKredse.clear();
+        ds.selectedKredse.clear();
         const defaults = KREDS_OPTIONS.map(o => o.key);
-        for (const k of (s.selectedKredse ?? defaults)) selectedKredse.add(String(k));
+        for (const k of (s.selectedKredse ?? defaults)) ds.selectedKredse.add(String(k));
 
-        entries.splice(0, entries.length);
+        ds.entries.splice(0, ds.entries.length);
         for (const e of s.entries) {
           const kredsKey = String(e.kredsKey ?? "");
-          entries.push({
+          ds.entries.push({
             id: e.id || uuid(),
             kredsKey: KREDS_LABEL_BY_KEY[kredsKey] ? kredsKey : "1",
             name: e.name || "",
             address: e.address || "",
             color: e.color || COLOR_PRESETS[0].value,
             radius: clampRadius(e.radius ?? 12),
-            opacity: clampOpacity(e.opacity ?? defaultOpacity),
+            opacity: clampOpacity(e.opacity ?? ds.defaultOpacity, ds.defaultOpacity),
             lat: (typeof e.lat === "number" ? e.lat : undefined),
             lng: (typeof e.lng === "number" ? e.lng : undefined),
           });
@@ -690,61 +733,137 @@
       } catch {}
     }
 
-    function clearStorage() {
-      try { localStorage.removeItem(STORAGE_KEY); } catch {}
-      try { localStorage.removeItem(SEED_KEY); } catch {}
+    function clearStorage(ds) {
+      try { localStorage.removeItem(STORAGE_KEYS[ds.id]); } catch {}
+      try { localStorage.removeItem(SEED_KEYS[ds.id]); } catch {}
     }
 
-    // ----------------- DAWA geokodning -----------------
-    async function geocodeDAWA(address) {
-      const params = new URLSearchParams();
-      params.set('q', address);
-      params.set('format', 'geojson');
-      params.set('struktur', 'mini');
-      params.set('srid', '4326');
-      if (LIMIT_TO_CPH) params.set('kommunekode', '0101');
+    // ----------------- Seed (kun Valgsteder) -----------------
+    function hasSeeded(ds) {
+      try { return localStorage.getItem(SEED_KEYS[ds.id]) === "1"; } catch { return false; }
+    }
+    function markSeeded(ds) {
+      try { localStorage.setItem(SEED_KEYS[ds.id], "1"); } catch {}
+    }
 
-      const urls = [
-        `https://api.dataforsyningen.dk/adresser?${params.toString()}`,
-        `https://dawa.aws.dk/adresser?${params.toString()}`
-      ];
+    function seedDefaultIfNeeded(ds) {
+      if (ds.id !== "valg") return false;
+      if (ds.entries.length > 0) return false;
+      if (hasSeeded(ds)) return false;
 
-      let lastErr = null;
-      for (const url of urls) {
-        try {
-          const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          const geo = await res.json();
-          const feat = geo && geo.features && geo.features[0];
-          if (!feat) return null;
-          const [lng, lat] = feat.geometry.coordinates;
-          return { lat, lng };
-        } catch (e) {
-          lastErr = e;
-        }
+      for (const v of DEFAULT_VALGSTEDER) {
+        ds.entries.push({
+          id: uuid(),
+          kredsKey: v.kredsKey,
+          name: v.name,
+          address: v.address,
+          color: DEFAULT_SEED_STYLE.color,
+          radius: DEFAULT_SEED_STYLE.radius,
+          opacity: ds.defaultOpacity,
+          lat: undefined,
+          lng: undefined
+        });
       }
-      throw lastErr || new Error('Geokodning fejlede');
+      markSeeded(ds);
+      saveState(ds);
+      return true;
     }
 
-    async function geocodeAndSetCoords(e, { flyTo = false } = {}) {
+    // ----------------- Geocode -----------------
+    async function geocodeAndSetCoords(ds, e, { flyTo = false } = {}) {
       await new Promise(r => setTimeout(r, PER_REQUEST_DELAY_MS));
       const g = await geocodeDAWA(e.address);
       if (!g) return { ok:false, error:"Ingen match" };
       e.lat = g.lat; e.lng = g.lng;
 
-      const m = ensureMarker(e);
+      const m = ensureMarker(ds, e);
       if (m) {
         m.setLatLng([e.lat, e.lng]);
-        updateMarkerStyleAndPopup(e);
+        updateMarkerStyleAndPopup(ds, e);
       }
-      updateVisibility();
+      updateVisibility(ds);
 
       if (flyTo) map.setView([e.lat, e.lng], Math.max(map.getZoom(), 14));
       return { ok:true };
     }
 
-    // ----------------- Filters UI (kun kredse/kategorier) -----------------
-    function renderKredsFilters() {
+    async function geocodeAllMissing(ds) {
+      if (ds.geocoding) return;
+      const pending = ds.entries.filter(e => !(Number.isFinite(e.lat) && Number.isFinite(e.lng)));
+      if (!pending.length) return;
+
+      ds.geocoding = true;
+      const failed = [];
+
+      for (let i = 0; i < pending.length; i++) {
+        const e = pending[i];
+        try {
+          const r = await geocodeAndSetCoords(ds, e, { flyTo: false });
+          if (!r.ok) failed.push({ name: e.name, address: e.address, error: r.error || "Ingen match" });
+        } catch (err) {
+          failed.push({ name: e.name, address: e.address, error: String(err?.message || err) });
+        }
+        saveState(ds);
+      }
+
+      renderKredsLists(ds);
+      updateVisibility(ds);
+
+      // Vis kun fejl
+      if (failed.length) {
+        let msg = `Disse adresser kunne ikke geokodes (ret dem manuelt):\n`;
+        for (const f of failed) msg += `- ${f.name}: ${f.address} (${f.error})\n`;
+        ds.statusMsg = msg;
+      } else {
+        ds.statusMsg = "";
+      }
+      if (active().id === ds.id) refreshStatus();
+      ds.geocoding = false;
+    }
+
+    // ----------------- Bulk UI -----------------
+    function populateBulkTargetColor() {
+      const sel = document.getElementById('bulkTargetColor');
+      sel.innerHTML = '';
+
+      const all = document.createElement('option');
+      all.value = "__all__";
+      all.textContent = "Alle farver";
+      sel.appendChild(all);
+
+      for (const c of COLOR_PRESETS) {
+        const opt = document.createElement('option');
+        opt.value = c.value;
+        opt.textContent = c.label;
+        sel.appendChild(opt);
+      }
+      sel.value = "__all__";
+      updateBulkTargetHint(active());
+      updateBulkSummary(active());
+    }
+
+    function getBulkTargets(ds) {
+      const target = document.getElementById('bulkTargetColor').value;
+      if (target === "__all__") return ds.entries.slice();
+      return ds.entries.filter(e => e.color === target);
+    }
+
+    function updateBulkTargetHint(ds) {
+      const target = document.getElementById('bulkTargetColor').value;
+      const hintEl = document.getElementById('bulkTargetHint');
+      if (target === "__all__") hintEl.textContent = "Ændringerne påvirker alle farver.";
+      else hintEl.textContent = `Ændringerne påvirker kun "${COLOR_LABEL_BY_VALUE[target] || target}".`;
+      updateBulkSummary(ds);
+    }
+
+    function updateBulkSummary(ds) {
+      const total = ds.entries.length;
+      const count = getBulkTargets(ds).length;
+      document.getElementById('bulkSummary').textContent = total ? `${count}/${total}` : '';
+    }
+
+    // ----------------- Filters + List UI -----------------
+    function renderKredsFilters(ds) {
       const container = document.getElementById('kredsFilters');
       container.innerHTML = '';
 
@@ -753,60 +872,59 @@
         const lab = document.createElement('label');
         lab.className = 'filterItem';
         lab.innerHTML = `
-          <input type="checkbox" id="${id}" ${selectedKredse.has(o.key) ? 'checked' : ''}/>
+          <input type="checkbox" id="${id}" ${ds.selectedKredse.has(o.key) ? 'checked' : ''}/>
           <span>${escapeHtml(o.label)}</span>
         `;
         container.appendChild(lab);
 
         lab.querySelector('input').addEventListener('change', (ev) => {
-          if (ev.target.checked) selectedKredse.add(o.key);
-          else selectedKredse.delete(o.key);
-          updateVisibility();
-          saveState();
-          renderKredsSummaries();
-          renderKredsLists();
+          if (ev.target.checked) ds.selectedKredse.add(o.key);
+          else ds.selectedKredse.delete(o.key);
+          updateVisibility(ds);
+          saveState(ds);
+          renderKredsSummaries(ds);
+          renderKredsLists(ds);
         });
       }
-      renderKredsSummaries();
+      renderKredsSummaries(ds);
     }
 
-    function setAllKredse(on) {
-      selectedKredse.clear();
-      if (on) for (const o of KREDS_OPTIONS) selectedKredse.add(o.key);
-      renderKredsFilters();
-      updateVisibility();
-      saveState();
-      renderKredsLists();
+    function setAllKredse(ds, on) {
+      ds.selectedKredse.clear();
+      if (on) for (const o of KREDS_OPTIONS) ds.selectedKredse.add(o.key);
+      renderKredsFilters(ds);
+      updateVisibility(ds);
+      saveState(ds);
+      renderKredsLists(ds);
     }
 
-    function renderKredsSummaries() {
-      document.getElementById('kredsSummary').textContent = `${selectedKredse.size}/${KREDS_OPTIONS.length} valgt`;
+    function renderKredsSummaries(ds) {
+      document.getElementById('kredsSummary').textContent = `${ds.selectedKredse.size}/${KREDS_OPTIONS.length} valgt`;
     }
 
-    function updateSummaries() {
-      const visible = entries.filter(isEntryVisible).length;
-      document.getElementById('filterSummary').textContent = `${visible}/${entries.length} vises`;
-      document.getElementById('listSummary').textContent = `${entries.length} total`;
-      renderKredsSummaries();
-      updateBulkSummary();
+    function updateSummaries(ds) {
+      const visible = ds.entries.filter(e => isEntryVisible(ds, e)).length;
+      document.getElementById('filterSummary').textContent = `${visible}/${ds.entries.length} vises`;
+      document.getElementById('listSummary').textContent = `${ds.entries.length} total`;
+      renderKredsSummaries(ds);
+      updateBulkSummary(ds);
     }
 
-    // ----------------- Liste pr. kreds/kategori -----------------
-    function groupEntriesByKredsKey() {
+    function groupEntriesByKredsKey(ds) {
       const byK = new Map();
       for (const o of KREDS_OPTIONS) byK.set(o.key, []);
-      for (const e of entries) {
+      for (const e of ds.entries) {
         const k = byK.has(e.kredsKey) ? e.kredsKey : "1";
         byK.get(k).push(e);
       }
       return byK;
     }
 
-    function renderKredsLists() {
+    function renderKredsLists(ds) {
       const container = document.getElementById('kredsLists');
       container.innerHTML = '';
 
-      const byK = groupEntriesByKredsKey();
+      const byK = groupEntriesByKredsKey(ds);
 
       for (const o of KREDS_OPTIONS) {
         const list = byK.get(o.key) || [];
@@ -814,14 +932,14 @@
         det.open = list.length > 0;
         det.style.marginTop = "10px";
 
-        const visCount = list.filter(isEntryVisible).length;
+        const visCount = list.filter(e => isEntryVisible(ds, e)).length;
         det.innerHTML = `
           <summary>
             ${escapeHtml(o.label)}
             <span class="summaryRight">${list.length} (viser ${visCount})</span>
           </summary>
           <div style="margin-top:10px;">
-            ${list.length === 0 ? `<div class="hint">Ingen valgsteder.</div>` : `
+            ${list.length === 0 ? `<div class="hint">Ingen steder.</div>` : `
               <table>
                 <thead>
                   <tr>
@@ -843,7 +961,7 @@
 
           for (const e of list) {
             const tr = document.createElement('tr');
-            const isEditing = editingIds.has(e.id);
+            const isEditing = ds.editingIds.has(e.id);
 
             if (!isEditing) {
               tr.innerHTML = `
@@ -884,7 +1002,7 @@
               `;
             }
 
-            if (!isEntryVisible(e)) tr.style.opacity = "0.5";
+            if (!isEntryVisible(ds, e)) tr.style.opacity = "0.5";
             tbody.appendChild(tr);
 
             if (isEditing) {
@@ -900,27 +1018,27 @@
       // bind delete (kun i redigér) + confirm
       container.querySelectorAll('button[data-del]').forEach(btn => {
         btn.addEventListener('click', () => {
-          if (!confirm("Er du sikker på, at du vil slette dette valgsted?")) return;
+          if (!confirm("Er du sikker på, at du vil slette dette sted?")) return;
 
           const id = btn.getAttribute('data-del');
-          const idx = entries.findIndex(x => x.id === id);
+          const idx = ds.entries.findIndex(x => x.id === id);
           if (idx < 0) return;
 
-          const e = entries[idx];
-          const m = markerById.get(e.id);
+          const e = ds.entries[idx];
+          const m = ds.markerById.get(e.id);
           if (m) {
-            if (markerGroup.hasLayer(m)) markerGroup.removeLayer(m);
+            if (ds.layerGroup.hasLayer(m)) ds.layerGroup.removeLayer(m);
             m.remove();
-            markerById.delete(e.id);
+            ds.markerById.delete(e.id);
           }
 
-          editingIds.delete(e.id);
-          backups.delete(e.id);
+          ds.editingIds.delete(e.id);
+          ds.backups.delete(e.id);
 
-          entries.splice(idx, 1);
-          saveState();
-          renderKredsLists();
-          updateVisibility();
+          ds.entries.splice(idx, 1);
+          saveState(ds);
+          renderKredsLists(ds);
+          updateVisibility(ds);
           setStatus('');
         });
       });
@@ -928,12 +1046,12 @@
       container.querySelectorAll('button[data-edit]').forEach(btn => {
         btn.addEventListener('click', () => {
           const id = btn.getAttribute('data-edit');
-          const e = entries.find(x => x.id === id);
+          const e = ds.entries.find(x => x.id === id);
           if (!e) return;
 
-          backups.set(id, { ...e });
-          editingIds.add(id);
-          renderKredsLists();
+          ds.backups.set(id, { ...e });
+          ds.editingIds.add(id);
+          renderKredsLists(ds);
           setStatus('');
         });
       });
@@ -941,17 +1059,17 @@
       container.querySelectorAll('button[data-cancel]').forEach(btn => {
         btn.addEventListener('click', () => {
           const id = btn.getAttribute('data-cancel');
-          const e = entries.find(x => x.id === id);
-          const b = backups.get(id);
+          const e = ds.entries.find(x => x.id === id);
+          const b = ds.backups.get(id);
           if (e && b) {
             Object.assign(e, b);
-            ensureMarker(e);
-            updateMarkerStyleAndPopup(e);
-            updateVisibility();
+            ensureMarker(ds, e);
+            updateMarkerStyleAndPopup(ds, e);
+            updateVisibility(ds);
           }
-          editingIds.delete(id);
-          backups.delete(id);
-          renderKredsLists();
+          ds.editingIds.delete(id);
+          ds.backups.delete(id);
+          renderKredsLists(ds);
           setStatus('');
         });
       });
@@ -959,8 +1077,8 @@
       container.querySelectorAll('button[data-save]').forEach(btn => {
         btn.addEventListener('click', async () => {
           const id = btn.getAttribute('data-save');
-          const e = entries.find(x => x.id === id);
-          const b = backups.get(id);
+          const e = ds.entries.find(x => x.id === id);
+          const b = ds.backups.get(id);
           if (!e || !b) return;
 
           const kredsSel = container.querySelector(`select[data-editkreds="${CSS.escape(id)}"]`);
@@ -988,24 +1106,24 @@
 
           try {
             if (newAddr !== oldAddr) {
-              const r = await geocodeAndSetCoords(e, { flyTo: true });
+              const r = await geocodeAndSetCoords(ds, e, { flyTo: true });
               if (!r.ok) throw new Error("Ingen match på adresse");
             } else {
-              ensureMarker(e);
-              updateMarkerStyleAndPopup(e);
-              updateVisibility();
+              ensureMarker(ds, e);
+              updateMarkerStyleAndPopup(ds, e);
+              updateVisibility(ds);
             }
 
-            editingIds.delete(id);
-            backups.delete(id);
-            saveState();
-            renderKredsLists();
+            ds.editingIds.delete(id);
+            ds.backups.delete(id);
+            saveState(ds);
+            renderKredsLists(ds);
             setStatus('');
           } catch (err) {
             Object.assign(e, b);
-            ensureMarker(e);
-            updateMarkerStyleAndPopup(e);
-            updateVisibility();
+            ensureMarker(ds, e);
+            updateMarkerStyleAndPopup(ds, e);
+            updateVisibility(ds);
 
             setStatus(
               'Kunne ikke gemme ændringer.\n' +
@@ -1016,11 +1134,12 @@
         });
       });
 
-      updateSummaries();
+      updateSummaries(ds);
     }
 
     // ----------------- Add handler -----------------
     async function addEntry() {
+      const ds = active();
       const btn = document.getElementById('add');
       btn.disabled = true;
 
@@ -1041,28 +1160,28 @@
         return;
       }
 
-      const e = { id: uuid(), kredsKey, name, address, color, radius, opacity: defaultOpacity, lat: undefined, lng: undefined };
-      entries.push(e);
-      renderKredsLists();
+      const e = { id: uuid(), kredsKey, name, address, color, radius, opacity: ds.defaultOpacity, lat: undefined, lng: undefined };
+      ds.entries.push(e);
+      renderKredsLists(ds);
       setStatus('');
 
       try {
-        const r = await geocodeAndSetCoords(e, { flyTo: true });
+        const r = await geocodeAndSetCoords(ds, e, { flyTo: true });
         if (!r.ok) throw new Error("Ingen match");
 
         document.getElementById('name').value = '';
         document.getElementById('address').value = '';
         document.getElementById('address').focus();
 
-        saveState();
-        renderKredsLists();
-        updateVisibility();
+        saveState(ds);
+        renderKredsLists(ds);
+        updateVisibility(ds);
         setStatus('');
       } catch (err) {
-        const idx = entries.findIndex(x => x.id === e.id);
-        if (idx >= 0) entries.splice(idx, 1);
-        renderKredsLists();
-        updateVisibility();
+        const idx = ds.entries.findIndex(x => x.id === e.id);
+        if (idx >= 0) ds.entries.splice(idx, 1);
+        renderKredsLists(ds);
+        updateVisibility(ds);
 
         setStatus(
           'Kunne ikke hente koordinater.\n' +
@@ -1074,66 +1193,69 @@
       }
     }
 
-    // ----------------- Bulk handlers (segmenteret efter farve) -----------------
+    // ----------------- Bulk handlers -----------------
     function applyBulkRadius() {
-      const targets = getBulkTargets();
+      const ds = active();
+      const targets = getBulkTargets(ds);
       const r = clampRadius(document.getElementById('bulkRadiusNumber').value);
-      if (targets.length === 0) { setStatus('Ingen valgsteder matcher den valgte farve.'); return; }
+      if (targets.length === 0) { setStatus('Ingen steder matcher den valgte farve.'); return; }
 
       for (const e of targets) {
         e.radius = r;
-        ensureMarker(e);
-        updateMarkerStyleAndPopup(e);
+        ensureMarker(ds, e);
+        updateMarkerStyleAndPopup(ds, e);
       }
-      saveState();
-      renderKredsLists();
-      updateVisibility();
+      saveState(ds);
+      renderKredsLists(ds);
+      updateVisibility(ds);
       setStatus('');
     }
 
     function applyBulkColor() {
-      const targets = getBulkTargets();
+      const ds = active();
+      const targets = getBulkTargets(ds);
       const c = document.getElementById('bulkColor').value;
-      if (targets.length === 0) { setStatus('Ingen valgsteder matcher den valgte farve.'); return; }
+      if (targets.length === 0) { setStatus('Ingen steder matcher den valgte farve.'); return; }
 
       for (const e of targets) {
         e.color = c;
-        ensureMarker(e);
-        updateMarkerStyleAndPopup(e);
+        ensureMarker(ds, e);
+        updateMarkerStyleAndPopup(ds, e);
       }
-      saveState();
-      renderKredsLists();
-      updateVisibility();
+      saveState(ds);
+      renderKredsLists(ds);
+      updateVisibility(ds);
       setStatus('');
-      updateBulkTargetHint();
+      updateBulkTargetHint(ds);
     }
 
     const bulkOpacityRange = document.getElementById('bulkOpacityRange');
     const bulkOpacityNumber = document.getElementById('bulkOpacityNumber');
 
     function syncBulkOpacityFrom(source) {
-      const op = clampOpacity(source.value);
+      const ds = active();
+      const op = clampOpacity(source.value, ds.defaultOpacity);
 
-      defaultOpacity = op;
+      ds.defaultOpacity = op;
       bulkOpacityRange.value = String(op);
       bulkOpacityNumber.value = String(op);
 
-      const targets = getBulkTargets();
-      if (targets.length === 0 && entries.length > 0) {
-        setStatus('Ingen valgsteder matcher den valgte farve.');
-        saveState();
+      const targets = getBulkTargets(ds);
+      if (targets.length === 0 && ds.entries.length > 0) {
+        setStatus('Ingen steder matcher den valgte farve.');
+        saveState(ds);
         return;
       }
 
       for (const e of targets) {
         e.opacity = op;
-        ensureMarker(e);
-        updateMarkerStyleAndPopup(e);
+        ensureMarker(ds, e);
+        updateMarkerStyleAndPopup(ds, e);
       }
 
-      saveState();
-      renderKredsLists();
-      updateVisibility();
+      saveState(ds);
+      renderKredsLists(ds);
+      updateVisibility(ds);
       setStatus('');
     }
 
@@ -1185,68 +1307,75 @@
       handle.addEventListener('dblclick', () => setSidebarWidth(420));
     }
 
-    // ----------------- Seed + auto-geocode -----------------
-    function hasSeeded() {
-      try { return localStorage.getItem(SEED_KEY) === "1"; } catch { return false; }
-    }
-    function markSeeded() {
-      try { localStorage.setItem(SEED_KEY, "1"); } catch {}
-    }
+    // ----------------- Tabs -----------------
+    function applyTabText() {
+      const ds = active();
 
-    function seedDefaultValgstederIfEmpty() {
-      if (entries.length > 0) return false;
-      if (hasSeeded()) return false;
+      const pageTitle = document.getElementById('pageTitle');
+      const listTitle = document.getElementById('listTitle');
+      const bulkTitle = document.getElementById('bulkTitle');
 
-      for (const v of DEFAULT_VALGSTEDER) {
-        entries.push({
-          id: uuid(),
-          kredsKey: v.kredsKey,
-          name: v.name,
-          address: v.address,
-          color: DEFAULT_SEED_STYLE.color,
-          radius: DEFAULT_SEED_STYLE.radius,
-          opacity: defaultOpacity,
-          lat: undefined,
-          lng: undefined
-        });
-      }
-      markSeeded();
-      saveState();
-      return true;
-    }
-
-    async function geocodeAllMissing() {
-      const pending = entries.filter(e => !(Number.isFinite(e.lat) && Number.isFinite(e.lng)));
-      if (!pending.length) return;
-
-      const failed = [];
-      let ok = 0;
-
-      for (let i = 0; i < pending.length; i++) {
-        const e = pending[i];
-        try {
-          const r = await geocodeAndSetCoords(e, { flyTo: false });
-          if (!r.ok) failed.push({ name: e.name, address: e.address, error: r.error || "Ingen match" });
-          else ok++;
-        } catch (err) {
-          failed.push({ name: e.name, address: e.address, error: String(err?.message || err) });
-        }
-        saveState();
-      }
-
-      renderKredsLists();
-      updateVisibility();
-
-      // Ingen "Færdig ✅" ved succes – kun vis fejl, hvis der er nogen
-      if (failed.length) {
-        let msg = `Disse adresser kunne ikke geokodes (ret dem manuelt):\n`;
-        for (const f of failed) {
-          msg += `- ${f.name}: ${f.address} (${f.error})\n`;
-        }
-        setStatus(msg);
+      if (ds.id === "valg") {
+        document.title = "Tilføj valgsteder";
+        pageTitle.textContent = "Tilføj valgsteder";
+        listTitle.textContent = "Valgsteder fordelt på kreds";
+        bulkTitle.textContent = "Ændringer for alle valgsteder";
+        document.getElementById('clearAllStorage').textContent = "Slet alle gemte valgsteder";
       } else {
-        setStatus('');
+        document.title = "Tilføj brevstemmesteder";
+        pageTitle.textContent = "Tilføj brevstemmesteder";
+        listTitle.textContent = "Brevstemmesteder fordelt på kreds";
+        bulkTitle.textContent = "Ændringer for alle brevstemmesteder";
+        document.getElementById('clearAllStorage').textContent = "Slet alle gemte brevstemmesteder";
       }
+    }
+
+    function setActiveTab(id) {
+      if (id === activeId) return;
+
+      // skift knap-styling
+      document.getElementById('tabValg').classList.toggle('active', id === "valg");
+      document.getElementById('tabBrev').classList.toggle('active', id === "brev");
+
+      // fjern nuværende gruppe fra kortet
+      const prev = active();
+      if (map.hasLayer(prev.layerGroup)) map.removeLayer(prev.layerGroup);
+
+      activeId = id;
+
+      // sørg for state loaded
+      const ds = active();
+      loadState(ds);
+
+      // seed kun på valg
+      seedDefaultIfNeeded(ds);
+
+      // add gruppe
+      if (!map.hasLayer(ds.layerGroup)) ds.layerGroup.addTo(map);
+
+      // sørg for markører oprettet hvis coords findes
+      for (const e of ds.entries) {
+        if (typeof e.opacity !== "number") e.opacity = ds.defaultOpacity;
+        ensureMarker(ds, e);
+        updateMarkerStyleAndPopup(ds, e);
+      }
+
+      // UI
+      applyTabText();
+      refreshStatus();
+
+      bulkOpacityRange.value = String(ds.defaultOpacity);
+      bulkOpacityNumber.value = String(ds.defaultOpacity);
+
+      renderKredsFilters(ds);
+      renderKredsLists(ds);
+      updateVisibility(ds);
+      updateSummaries(ds);
+
+      // geocode hvis mangler coords
+      geocodeAllMissing(ds);
+
+      requestAnimationFrame(() => map.invalidateSize());
     }
 
     // ----------------- Init -----------------
@@ -1256,41 +1385,51 @@
     populateBulkTargetColor();
 
     loadSidebarWidth();
-    loadState();
-
-    bulkOpacityRange.value = String(defaultOpacity);
-    bulkOpacityNumber.value = String(defaultOpacity);
-
-    // seed hvis tom
-    seedDefaultValgstederIfEmpty();
-
-    // recreate markers for stored coords
-    for (const e of entries) {
-      if (typeof e.opacity !== "number") e.opacity = defaultOpacity;
-      ensureMarker(e);
-      updateMarkerStyleAndPopup(e);
-    }
-
-    renderKredsFilters();
-    renderKredsLists();
-    updateVisibility();
-    updateSummaries();
-
-    addCphRing2Overlay();
     initResizer();
 
-    // geocode (kun hvis mangler coords)
-    geocodeAllMissing();
+    // load begge datasæt (så tab-skift er hurtigt)
+    loadState(datasets.valg);
+    loadState(datasets.brev);
+
+    // seed valgsteder hvis tom
+    seedDefaultIfNeeded(datasets.valg);
+
+    // opret markører for begge datasæt (kun dem med coords)
+    for (const ds of [datasets.valg, datasets.brev]) {
+      for (const e of ds.entries) {
+        if (typeof e.opacity !== "number") e.opacity = ds.defaultOpacity;
+        ensureMarker(ds, e);
+        updateMarkerStyleAndPopup(ds, e);
+      }
+    }
+
+    // start på Valgsteder
+    applyTabText();
+    bulkOpacityRange.value = String(datasets.valg.defaultOpacity);
+    bulkOpacityNumber.value = String(datasets.valg.defaultOpacity);
+
+    renderKredsFilters(datasets.valg);
+    renderKredsLists(datasets.valg);
+    updateVisibility(datasets.valg);
+    updateSummaries(datasets.valg);
+    refreshStatus();
+
+    addCphRing2Overlay();
+
+    // geocode manglende coords (valg + brev)
+    geocodeAllMissing(datasets.valg);
+    geocodeAllMissing(datasets.brev);
 
     // bind
     document.getElementById('add').addEventListener('click', addEntry);
+
     document.getElementById('applyBulkRadius').addEventListener('click', applyBulkRadius);
     document.getElementById('applyBulkColor').addEventListener('click', applyBulkColor);
 
-    document.getElementById('kredsAll').addEventListener('click', () => setAllKredse(true));
-    document.getElementById('kredsNone').addEventListener('click', () => setAllKredse(false));
+    document.getElementById('kredsAll').addEventListener('click', () => setAllKredse(active(), true));
+    document.getElementById('kredsNone').addEventListener('click', () => setAllKredse(active(), false));
 
-    document.getElementById('bulkTargetColor').addEventListener('change', () => updateBulkTargetHint());
+    document.getElementById('bulkTargetColor').addEventListener('change', () => updateBulkTargetHint(active()));
 
     bulkOpacityRange.addEventListener('input', () => syncBulkOpacityFrom(bulkOpacityRange));
     bulkOpacityNumber.addEventListener('input', () => syncBulkOpacityFrom(bulkOpacityNumber));
@@ -1303,27 +1442,37 @@
     });
 
     document.getElementById('clearAllStorage').addEventListener('click', () => {
-      if (!confirm("Vil du slette alle gemte valgsteder?")) return;
-      clearStorage();
+      const ds = active();
+      if (!confirm("Vil du slette alt gemt for denne fane?")) return;
 
-      for (const m of markerById.values()) {
-        if (markerGroup.hasLayer(m)) markerGroup.removeLayer(m);
+      clearStorage(ds);
+
+      // fjern markører
+      for (const m of ds.markerById.values()) {
+        if (ds.layerGroup.hasLayer(m)) ds.layerGroup.removeLayer(m);
         m.remove();
       }
-      markerById.clear();
-      entries.splice(0, entries.length);
-      editingIds.clear();
-      backups.clear();
+      ds.markerById.clear();
 
-      selectedKredse.clear();
-      for (const o of KREDS_OPTIONS) selectedKredse.add(o.key);
+      ds.entries.splice(0, ds.entries.length);
+      ds.editingIds.clear();
+      ds.backups.clear();
+      ds.statusMsg = "";
 
-      renderKredsFilters();
-      renderKredsLists();
-      updateVisibility();
-      setStatus('');
-      updateBulkSummary();
+      ds.selectedKredse.clear();
+      for (const o of KREDS_OPTIONS) ds.selectedKredse.add(o.key);
+
+      renderKredsFilters(ds);
+      renderKredsLists(ds);
+      updateVisibility(ds);
+      updateSummaries(ds);
+      refreshStatus();
     });
+
+    // tabs
+    document.getElementById('tabValg').addEventListener('click', () => setActiveTab("valg"));
+    document.getElementById('tabBrev').addEventListener('click', () => setActiveTab("brev"));
+
   </script>
 </body>
 </html>
