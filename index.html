@@ -11,9 +11,9 @@
     :root { --border:#e8e8e8; --sidebar: 420px; }
     body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 0; }
 
-    /* Resizable layout: panel | resizer | map */
     .wrap { display: grid; grid-template-columns: var(--sidebar) 10px 1fr; height: 100vh; }
     .panel { padding: 14px; border-right: 1px solid var(--border); overflow: auto; overflow-x: hidden; }
+
     .resizer {
       cursor: col-resize;
       background: linear-gradient(to right, #0000, #0001, #0000);
@@ -52,7 +52,7 @@
     .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     .status { margin-top: 10px; font-size: 12px; color:#333; white-space: pre-wrap; }
 
-    /* Prevent overflow: fixed table layout + wrapping */
+    /* Prevent overflow */
     table { width: 100%; border-collapse: collapse; table-layout: fixed; }
     th, td {
       text-align: left; font-size: 12px; padding: 8px 6px;
@@ -70,7 +70,7 @@
     }
     .swatch { width: 10px; height: 10px; border-radius: 50%; border: 1px solid #0002; display:inline-block; flex: none; }
 
-    /* IMPORTANT: allow wrapping so "Redigér/Slet" never runs outside */
+    /* IMPORTANT: wrap actions so they never overflow */
     .actions { display:flex; gap:6px; flex-wrap: wrap; align-items:center; }
     .mini {
       padding: 6px 8px;
@@ -194,7 +194,7 @@
             <span class="summaryRight" id="bulkSummary"></span>
           </summary>
 
-          <!-- NYT: segmentering efter farve -->
+          <!-- Segmentering: alle eller én farve -->
           <label for="bulkTargetColor" style="margin-top:10px;">Gælder for (farve)</label>
           <select id="bulkTargetColor"></select>
           <div class="hint" id="bulkTargetHint"></div>
@@ -239,10 +239,8 @@
     const LIMIT_TO_CPH = true; // geokodning begrænses i baggrunden til kommunekode 0101
     const STORAGE_KEY = "valgsteder_state_v4";
     const UI_KEY = "valgsteder_ui_sidebar_v1";
+    const SEED_KEY = "valgsteder_seed_v1";
 
-    // Overlay styling:
-    // - ring 1 + ring 2 kommuner: mørkegrå udfyldning
-    // - København: rød outline, ingen fill
     const NEIGHBOR_STYLE = { color: "#2f2f2f", weight: 1, fillColor: "#2f2f2f", fillOpacity: 0.35 };
     const CPH_OUTLINE_STYLE = { color: "#e11d48", weight: 3, fillOpacity: 0 };
 
@@ -257,13 +255,98 @@
     ];
     const COLOR_LABEL_BY_VALUE = Object.fromEntries(COLOR_PRESETS.map(c => [c.value, c.label]));
 
-    // Kreds/kategorier: værdier (keys) + labels
+    // Kreds/kategorier
     const KREDS_OPTIONS = [
       ...Array.from({ length: 9 }, (_, i) => ({ key: String(i + 1), label: `${i + 1}. kreds` })),
       { key: "new",    label: "Nyt valgsted" },
       { key: "closed", label: "Nedlagt valgsted" }
     ];
     const KREDS_LABEL_BY_KEY = Object.fromEntries(KREDS_OPTIONS.map(o => [o.key, o.label]));
+
+    // --------- FORUDINDSATTE VALGSTEDER ---------
+    // Alle sættes som: rød (#e11d48), radius 8. Adresser renset for bedre DAWA-match.
+    const DEFAULT_VALGSTEDER = [
+      // 1. kreds
+      { kredsKey:"1", name:"1. Nord. Strandvejsskolen", address:"Sionsgade 1" },
+      { kredsKey:"1", name:"1. Nordhavn. Østerbrohuset", address:"Århusgade 103" },
+      { kredsKey:"1", name:"1. Nordvest. Kildevældskolen", address:"Bellmansgade 5A" },
+      { kredsKey:"1", name:"1. Syd. Remisen", address:"Blegdamsvej 132" },
+      { kredsKey:"1", name:"1. Vest. Nørre Fælled Skole", address:"Biskop Krags Vænge 7" },
+      { kredsKey:"1", name:"1. Øst. Skolen På Strandboulevarden", address:"Strandboulevarden 47" },
+      { kredsKey:"1", name:"1. Østerbro. Idrætshuset", address:"Gunnar Nu Hansens Plads 7" },
+
+      // 2. kreds
+      { kredsKey:"2", name:"2. Kalvebod Fælled. Kalvebod Fælled Skole", address:"Else Alfelts Vej 2" },
+      { kredsKey:"2", name:"2. Nord. Amager Fælled Skole", address:"Sundholmsvej 2A" },
+      { kredsKey:"2", name:"2. Peder Lykke. Peder Lykke Skolen", address:"Birketinget 3" },
+      { kredsKey:"2", name:"2. Sundbyvester. Sundby Idrætspark", address:"Englandsvej 61" },
+      { kredsKey:"2", name:"2. Ørestad. Ørestad Gymnasium", address:"Arne Jacobsens Allé 21" },
+      { kredsKey:"2", name:"2. Vest. Skolen På Islands Brygge", address:"Artillerivej 57" },
+      { kredsKey:"2", name:"2. Øst. Dyvekeskolen", address:"Remisevej 16" },
+
+      // 3. kreds
+      { kredsKey:"3", name:"3. Indre By. Rådhushallen", address:"Rådhuspladsen 1" },
+      { kredsKey:"3", name:"3. Midt. Den Classenske Legatskole", address:"Vester Voldgade 98" },
+      { kredsKey:"3", name:"3. Nord. Øster Farimagsgade Skole", address:"Øster Farimagsgade 40" },
+      { kredsKey:"3", name:"3. Syd. Hal C", address:"Arsenalvej 6" },
+      { kredsKey:"3", name:"3. Sølvgade. Sølvgades Skole", address:"Sølvgade 16" },
+      { kredsKey:"3", name:"3. Øst. Nyboder Skole", address:"Øster Voldgade 15" },
+
+      // 4. kreds (Sundbyøster)
+      { kredsKey:"4", name:"4. Nord. Skolen På Amagerbro", address:"Lybækgade 20" },
+      { kredsKey:"4", name:"4. Nordøst. Nordøstamager Skole", address:"Holmbladsgade 117" },
+      { kredsKey:"4", name:"4. Sundbyøster. Lergravsparkens Skole", address:"Wittenberggade 2" },
+      { kredsKey:"4", name:"4. Syd. Gerbrandskolen", address:"Gerbrandsvej 9" },
+      { kredsKey:"4", name:"4. Øst. Skolen Ved Sundet", address:"Samosvej 50" },
+
+      // 5. kreds (Nørrebro)
+      { kredsKey:"5", name:"5. Nord. Rådmandsgades Skole", address:"Rådmandsgade 22" },
+      { kredsKey:"5", name:"5. Nordvest. Frederiksgård Skole", address:"Ørholmsgade 8" },
+      { kredsKey:"5", name:"5. Nørrebro. Guldberg Skole", address:"Sjællandsgade 10" },
+      { kredsKey:"5", name:"5. Nørrebrohallen. Nørrebrohallen", address:"Nørrebrogade 208" },
+      { kredsKey:"5", name:"5. Syd. Korsgadehallen", address:"Korsgade 29" },
+      { kredsKey:"5", name:"5. Vest. Nørrebro Park Skole", address:"Jagtvej 34" },
+      { kredsKey:"5", name:"5. Øst. Plejecentret Sølund", address:"Ryesgade 20A" },
+
+      // 6. kreds (Bispebjerg)
+      { kredsKey:"6", name:"6. Bispebjerg. Tagensbo Skole", address:"Hovmestervej 19" },
+      { kredsKey:"6", name:"6. Nord. Holbergskolen", address:"Frederiksborgvej 216" },
+      { kredsKey:"6", name:"6. Syd. Grøndalsvængets Skole", address:"Rørsangervej 29" },
+      { kredsKey:"6", name:"6. Vest. Utterslev Skole", address:"Skoleholdervej 20" },
+      { kredsKey:"6", name:"6. Øst. Lundehusskolen", address:"Lersø Parkallé 152" },
+
+      // 7. kreds (Brønshøj/Vanløse/Husum)
+      { kredsKey:"7", name:"7. Kirkebjerg. Kirkebjerg Skole", address:"Vanløsehøj 4" },
+      { kredsKey:"7", name:"7. Nord. Tingbjerg Skole", address:"Skolesiden 2" },
+      { kredsKey:"7", name:"7. Nordvest. Husum Skole", address:"Karlslundevej 23" },
+      { kredsKey:"7", name:"7. Rødkilde. Rødkilde Skole", address:"Godthåbsvej 274" },
+      { kredsKey:"7", name:"7. Vanløse. Vanløsehallerne", address:"Lønstrupvej 5" },
+      { kredsKey:"7", name:"7. Vest. Energicenter Voldparken", address:"Kobbelvænget 65" },
+      { kredsKey:"7", name:"7. Øst. Bellahøj Skole", address:"Svenskelejren 18" },
+
+      // 8. kreds (Valby)
+      { kredsKey:"8", name:"8. Midt. Vigerslev Allés Skole", address:"Vigerslev Allé 108" },
+      { kredsKey:"8", name:"8. Nord. Prøvehallen", address:"Porcelænstorvet 4" },
+      { kredsKey:"8", name:"8. Syd. Kirsebærhavens Skole", address:"Kirsebærhaven 23" },
+      { kredsKey:"8", name:"8. Sydøst. Sankt Annæ Gymnasium", address:"Sjælør Boulevard 135" },
+      { kredsKey:"8", name:"8. Valby. Ålholm Skole", address:"Vibeholmen 1" },
+      { kredsKey:"8", name:"8. Vest. Lykkebo Hallen", address:"Lykkebovej 32" },
+
+      // 9. kreds (Vesterbro/Sydhavn)
+      { kredsKey:"9", name:"9. Midt. Bavnehøjhallen", address:"Enghavevej 90" },
+      { kredsKey:"9", name:"9. Nord. Oehlenschlægersgades Skole", address:"Oehlenschlægersgade 57" },
+      { kredsKey:"9", name:"9. Sluseholmen. Sluseholmen Skole", address:"Ved Stigbordene 26" },
+      { kredsKey:"9", name:"9. Syd. Ellebjerg Skole", address:"P. Knudsens Gade 37-39" },
+      { kredsKey:"9", name:"9. Sydhavn. Skolen I Sydhavnen", address:"Støberigade 1" },
+      { kredsKey:"9", name:"9. Vest. Vesterbro Ny Skole", address:"Slesvigsgade 6" },
+      { kredsKey:"9", name:"9. Vesterbro. Tove Ditlevsens Skole", address:"Enghave Plads 21" },
+      { kredsKey:"9", name:"9. Øst. Skolen Ved Dybbølsbro", address:"Kødboderne 8" },
+    ];
+
+    const DEFAULT_SEED_STYLE = {
+      color: "#e11d48",
+      radius: 8
+    };
 
     // ----------------- Kort -----------------
     const map = L.map('map').setView([55.6761, 12.5683], 12);
@@ -272,27 +355,22 @@
       attribution: '&copy; OpenStreetMap'
     }).addTo(map);
 
-    // Pane til ring 1+2 (over tiles, under markører)
     map.createPane('neighborsPane');
     map.getPane('neighborsPane').style.zIndex = 430;
     map.getPane('neighborsPane').style.pointerEvents = 'none';
 
-    // Pane til København outline (over naboer, under markører)
     map.createPane('cphOutlinePane');
     map.getPane('cphOutlinePane').style.zIndex = 440;
     map.getPane('cphOutlinePane').style.pointerEvents = 'none';
 
-    // Markører øverst
     const markerGroup = L.layerGroup().addTo(map);
 
     // ----------------- State -----------------
     // entry: {id, kredsKey, name, address, color, radius, opacity, lat, lng}
     const entries = [];
-
-    // Filtre: kun kredse/kategorier
     const selectedKredse = new Set(KREDS_OPTIONS.map(o => o.key));
 
-    // Default opacity (bruges også til nye punkter)
+    // default opacity for nye punkter
     let defaultOpacity = 0.55;
 
     const markerById = new Map();
@@ -322,7 +400,7 @@
     function clampOpacity(v) {
       const n = Number(v);
       if (!Number.isFinite(n)) return defaultOpacity;
-      return Math.max(0, Math.min(1, Math.round(n * 20) / 20)); // 0.05 step
+      return Math.max(0, Math.min(1, Math.round(n * 20) / 20));
     }
 
     function populateColorSelect(selectEl, defaultValue) {
@@ -415,12 +493,7 @@
       if (!m) return;
 
       const op = (typeof e.opacity === "number") ? e.opacity : defaultOpacity;
-      m.setStyle({
-        color: e.color,
-        fillColor: e.color,
-        fillOpacity: op,
-        weight: 1
-      });
+      m.setStyle({ color: e.color, fillColor: e.color, fillOpacity: op, weight: 1 });
       m.setRadius(e.radius);
       m.bindPopup(markerPopupHtml(e));
     }
@@ -448,11 +521,8 @@
     function updateBulkTargetHint() {
       const target = document.getElementById('bulkTargetColor').value;
       const hintEl = document.getElementById('bulkTargetHint');
-      if (target === "__all__") {
-        hintEl.textContent = "Ændringerne påvirker alle farver.";
-      } else {
-        hintEl.textContent = `Ændringerne påvirker kun "${COLOR_LABEL_BY_VALUE[target] || target}".`;
-      }
+      if (target === "__all__") hintEl.textContent = "Ændringerne påvirker alle farver.";
+      else hintEl.textContent = `Ændringerne påvirker kun "${COLOR_LABEL_BY_VALUE[target] || target}".`;
       updateBulkSummary();
     }
 
@@ -466,23 +536,17 @@
     function collectRoundedCoordKeys(geometry, decimals = 6) {
       const out = [];
       const round = (x) => Number(x).toFixed(decimals);
-
       function pushPoint(pt) {
         if (!pt || pt.length < 2) return;
         out.push(`${round(pt[0])},${round(pt[1])}`);
       }
-
       if (!geometry) return out;
 
       if (geometry.type === "Polygon") {
-        for (const ring of geometry.coordinates || []) {
-          for (const pt of ring || []) pushPoint(pt);
-        }
+        for (const ring of geometry.coordinates || []) for (const pt of ring || []) pushPoint(pt);
       } else if (geometry.type === "MultiPolygon") {
         for (const poly of geometry.coordinates || []) {
-          for (const ring of poly || []) {
-            for (const pt of ring || []) pushPoint(pt);
-          }
+          for (const ring of poly || []) for (const pt of ring || []) pushPoint(pt);
         }
       }
       return out;
@@ -500,7 +564,6 @@
         const cph = feats.find(f => getCode(f) === "0101") || feats.find(f => /københavn/i.test(String((f.properties||{}).navn||"")));
         if (!cph) return;
 
-        // Byg index: coordKey -> set af kommunekoder der har det punkt
         const keyToCodes = new Map();
         const codeToFeature = new Map();
 
@@ -517,7 +580,6 @@
           }
         }
 
-        // Adjacency: kommune -> set af naboer (deler mindst én key)
         const adjacency = new Map();
         for (const [, codesSet] of keyToCodes.entries()) {
           const codes = Array.from(codesSet);
@@ -533,7 +595,6 @@
           }
         }
 
-        // BFS fra København til dybde 2
         const start = "0101";
         const depth = new Map([[start, 0]]);
         const q = [start];
@@ -544,14 +605,10 @@
           if (d >= 2) continue;
           const neigh = adjacency.get(cur) || new Set();
           for (const n of neigh) {
-            if (!depth.has(n)) {
-              depth.set(n, d + 1);
-              q.push(n);
-            }
+            if (!depth.has(n)) { depth.set(n, d + 1); q.push(n); }
           }
         }
 
-        // Farv alle med depth 1 eller 2, plus Frederiksberg (0147), men ikke København selv.
         const grayCodes = new Set();
         for (const [code, d] of depth.entries()) {
           if (code === start) continue;
@@ -612,7 +669,6 @@
         const s = JSON.parse(raw);
         if (!s || !Array.isArray(s.entries)) return;
 
-        // Bagudkompatibel: tidligere brugte "opacity"
         defaultOpacity = clampOpacity(s.defaultOpacity ?? s.opacity ?? 0.55);
 
         selectedKredse.clear();
@@ -639,6 +695,7 @@
 
     function clearStorage() {
       try { localStorage.removeItem(STORAGE_KEY); } catch {}
+      try { localStorage.removeItem(SEED_KEY); } catch {}
     }
 
     // ----------------- DAWA geokodning -----------------
@@ -672,7 +729,7 @@
       throw lastErr || new Error('Geokodning fejlede');
     }
 
-    async function geocodeAndSetCoords(e, { flyTo = true } = {}) {
+    async function geocodeAndSetCoords(e, { flyTo = false } = {}) {
       await new Promise(r => setTimeout(r, PER_REQUEST_DELAY_MS));
       const g = await geocodeDAWA(e.address);
       if (!g) return { ok:false, error:"Ingen match" };
@@ -895,15 +952,7 @@
           const e = entries.find(x => x.id === id);
           const b = backups.get(id);
           if (e && b) {
-            e.kredsKey = b.kredsKey;
-            e.name = b.name;
-            e.address = b.address;
-            e.color = b.color;
-            e.radius = b.radius;
-            e.opacity = b.opacity;
-            e.lat = b.lat;
-            e.lng = b.lng;
-
+            Object.assign(e, b);
             ensureMarker(e);
             updateMarkerStyleAndPopup(e);
             updateVisibility();
@@ -961,15 +1010,7 @@
             renderKredsLists();
             setStatus('');
           } catch (err) {
-            e.kredsKey = b.kredsKey;
-            e.name = b.name;
-            e.address = b.address;
-            e.color = b.color;
-            e.radius = b.radius;
-            e.opacity = b.opacity;
-            e.lat = b.lat;
-            e.lng = b.lng;
-
+            Object.assign(e, b);
             ensureMarker(e);
             updateMarkerStyleAndPopup(e);
             updateVisibility();
@@ -1008,18 +1049,7 @@
         return;
       }
 
-      const e = {
-        id: uuid(),
-        kredsKey,
-        name,
-        address,
-        color,
-        radius,
-        opacity: defaultOpacity,
-        lat: undefined,
-        lng: undefined
-      };
-
+      const e = { id: uuid(), kredsKey, name, address, color, radius, opacity: defaultOpacity, lat: undefined, lng: undefined };
       entries.push(e);
       renderKredsLists();
       setStatus('');
@@ -1083,22 +1113,19 @@
       renderKredsLists();
       updateVisibility();
       setStatus('');
-      updateBulkTargetHint(); // hvis man ændrer farver, kan målgruppen ændre sig
+      updateBulkTargetHint();
     }
 
-    // Opacity (segmenteret efter farve, eller alle)
     const bulkOpacityRange = document.getElementById('bulkOpacityRange');
     const bulkOpacityNumber = document.getElementById('bulkOpacityNumber');
 
     function syncBulkOpacityFrom(source) {
       const op = clampOpacity(source.value);
 
-      // Opdater UI + default
       defaultOpacity = op;
       bulkOpacityRange.value = String(op);
       bulkOpacityNumber.value = String(op);
 
-      // Sæt opacitet på målgruppen
       const targets = getBulkTargets();
       if (targets.length === 0 && entries.length > 0) {
         setStatus('Ingen valgsteder matcher den valgte farve.');
@@ -1122,7 +1149,6 @@
     function setSidebarWidth(px) {
       const w = Math.max(280, Math.min(720, Math.round(px)));
       document.documentElement.style.setProperty('--sidebar', w + 'px');
-      // Leaflet skal have besked om resize
       requestAnimationFrame(() => map.invalidateSize());
       try { localStorage.setItem(UI_KEY, JSON.stringify({ sidebarWidth: w })); } catch {}
     }
@@ -1164,8 +1190,73 @@
         window.addEventListener('mouseup', onUp);
       });
 
-      // Dobbeltklik = reset
       handle.addEventListener('dblclick', () => setSidebarWidth(420));
+    }
+
+    // ----------------- Seed + auto-geocode -----------------
+    function hasSeeded() {
+      try { return localStorage.getItem(SEED_KEY) === "1"; } catch { return false; }
+    }
+    function markSeeded() {
+      try { localStorage.setItem(SEED_KEY, "1"); } catch {}
+    }
+
+    function seedDefaultValgstederIfEmpty() {
+      if (entries.length > 0) return false;
+      if (hasSeeded()) return false;
+
+      for (const v of DEFAULT_VALGSTEDER) {
+        entries.push({
+          id: uuid(),
+          kredsKey: v.kredsKey,
+          name: v.name,
+          address: v.address,
+          color: DEFAULT_SEED_STYLE.color,
+          radius: DEFAULT_SEED_STYLE.radius,
+          opacity: defaultOpacity,
+          lat: undefined,
+          lng: undefined
+        });
+      }
+      markSeeded();
+      saveState();
+      return true;
+    }
+
+    async function geocodeAllMissing() {
+      const pending = entries.filter(e => !(Number.isFinite(e.lat) && Number.isFinite(e.lng)));
+      if (!pending.length) return;
+
+      setStatus(`Indlæser standardvalgsteder…\nGeokoder ${pending.length} adresser…`);
+
+      const failed = [];
+      let ok = 0;
+
+      for (let i = 0; i < pending.length; i++) {
+        const e = pending[i];
+        setStatus(`Indlæser standardvalgsteder…\nGeokoder ${pending.length} adresser…\n${i+1}/${pending.length}: ${e.name}`);
+
+        try {
+          const r = await geocodeAndSetCoords(e, { flyTo: false });
+          if (!r.ok) failed.push({ name: e.name, address: e.address, error: r.error || "Ingen match" });
+          else ok++;
+        } catch (err) {
+          failed.push({ name: e.name, address: e.address, error: String(err?.message || err) });
+        }
+        saveState();
+      }
+
+      renderKredsLists();
+      updateVisibility();
+
+      let msg = `Færdig ✅\nMatchede: ${ok}\nFejl/ingen match: ${failed.length}\n`;
+      if (failed.length) {
+        msg += `\nDisse adresser kunne ikke geokodes (ret dem manuelt):\n`;
+        for (const f of failed) {
+          msg += `- ${f.name}: ${f.address} (${f.error})\n`;
+        }
+      }
+      setStatus(msg);
     }
 
     // ----------------- Init -----------------
@@ -1177,13 +1268,14 @@
     loadSidebarWidth();
     loadState();
 
-    // Init opacity UI til defaultOpacity
     bulkOpacityRange.value = String(defaultOpacity);
     bulkOpacityNumber.value = String(defaultOpacity);
 
-    // Recreate markers
+    // seed hvis tom
+    const didSeed = seedDefaultValgstederIfEmpty();
+
+    // recreate markers for stored coords
     for (const e of entries) {
-      // sikr at alle har opacity
       if (typeof e.opacity !== "number") e.opacity = defaultOpacity;
       ensureMarker(e);
       updateMarkerStyleAndPopup(e);
@@ -1194,9 +1286,11 @@
     updateVisibility();
     updateSummaries();
 
-    // Kommuner overlay: ring 1 + ring 2 grå + København rød outline
     addCphRing2Overlay();
     initResizer();
+
+    // hvis seeded eller der mangler coords -> geocode
+    geocodeAllMissing();
 
     // bind
     document.getElementById('add').addEventListener('click', addEntry);
@@ -1206,9 +1300,7 @@
     document.getElementById('kredsAll').addEventListener('click', () => setAllKredse(true));
     document.getElementById('kredsNone').addEventListener('click', () => setAllKredse(false));
 
-    document.getElementById('bulkTargetColor').addEventListener('change', () => {
-      updateBulkTargetHint();
-    });
+    document.getElementById('bulkTargetColor').addEventListener('change', () => updateBulkTargetHint());
 
     bulkOpacityRange.addEventListener('input', () => syncBulkOpacityFrom(bulkOpacityRange));
     bulkOpacityNumber.addEventListener('input', () => syncBulkOpacityFrom(bulkOpacityNumber));
