@@ -8,10 +8,18 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 
   <style>
-    :root { --border:#e8e8e8; }
+    :root { --border:#e8e8e8; --sidebar: 420px; }
     body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 0; }
-    .wrap { display: grid; grid-template-columns: 420px 1fr; height: 100vh; }
-    .panel { padding: 14px; border-right: 1px solid var(--border); overflow: auto; }
+    .wrap { display: grid; grid-template-columns: var(--sidebar) 10px 1fr; height: 100vh; }
+    .panel { padding: 14px; border-right: 1px solid var(--border); overflow: auto; overflow-x: hidden; }
+    .resizer {
+      cursor: col-resize;
+      background: linear-gradient(to right, #0000, #0001, #0000);
+      border-right: 1px solid var(--border);
+      border-left: 1px solid var(--border);
+    }
+    .resizer:hover { background: linear-gradient(to right, #0000, #0002, #0000); }
+
     h2 { font-size: 16px; margin: 0 0 12px; }
     label { display: block; font-size: 12px; color:#444; margin-top: 10px; }
 
@@ -31,6 +39,7 @@
       border-radius: 12px;
       cursor: pointer;
       margin-top: 10px;
+      box-sizing: border-box;
     }
     button.primary { background: #111; color: #fff; border-color:#111; }
     button:disabled { opacity: .6; cursor: not-allowed; }
@@ -42,8 +51,13 @@
 
     .status { margin-top: 10px; font-size: 12px; color:#333; white-space: pre-wrap; }
 
-    table { width: 100%; border-collapse: collapse; }
-    th, td { text-align: left; font-size: 12px; padding: 8px 6px; border-bottom: 1px solid #f0f0f0; vertical-align: top; }
+    /* Tables: fixed layout prevents overflow */
+    table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+    th, td {
+      text-align: left; font-size: 12px; padding: 8px 6px;
+      border-bottom: 1px solid #f0f0f0; vertical-align: top;
+      overflow-wrap: anywhere;
+    }
     th { color:#666; font-weight: 600; }
 
     .pill {
@@ -51,10 +65,12 @@
       padding: 3px 8px; border: 1px solid #0001; border-radius: 999px;
       background: #fff;
       white-space: nowrap;
+      max-width: 100%;
     }
-    .swatch { width: 10px; height: 10px; border-radius: 50%; border: 1px solid #0002; display:inline-block; }
+    .swatch { width: 10px; height: 10px; border-radius: 50%; border: 1px solid #0002; display:inline-block; flex: none; }
 
-    .actions { display:flex; gap:6px; flex-wrap: nowrap; align-items:center; }
+    /* Actions never overflow: wrap inside cell */
+    .actions { display:flex; gap:6px; flex-wrap: wrap; align-items:center; }
     .mini {
       padding: 6px 8px;
       border-radius: 10px;
@@ -65,6 +81,8 @@
       width: auto;
       margin-top: 0;
       white-space: nowrap;
+      max-width: 100%;
+      box-sizing: border-box;
     }
     .mini.primary { background:#111; color:#fff; border-color:#111; }
 
@@ -91,8 +109,8 @@
     summary::-webkit-details-marker { display: none; }
     .summaryRight { font-size: 12px; color:#666; font-weight: 500; }
 
-    .filterBtns { display:flex; gap:6px; margin-top: 8px; }
-    .filterGrid { display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 10px; margin-top: 10px; }
+    .filterBtns { display:flex; gap:6px; margin-top: 8px; flex-wrap: wrap; }
+    .filterGrid { display:grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px 10px; margin-top: 10px; }
     .filterItem { display:flex; align-items:center; gap:8px; font-size:12px; }
     .filterItem input { transform: translateY(1px); }
 
@@ -102,8 +120,13 @@
 
     .controlsRow { display:grid; grid-template-columns: 1fr 1fr; gap:10px; }
 
+    .bulkBox {
+      display: grid;
+      gap: 10px;
+    }
+
     @media (max-width: 420px) {
-      .filterGrid { grid-template-columns: repeat(1, minmax(0, 1fr)); }
+      .filterGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
   </style>
 </head>
@@ -133,6 +156,13 @@
         </div>
       </div>
 
+      <label for="opacityNumber">Opacity (0–1)</label>
+      <div class="controlsRow">
+        <input id="opacityRange" type="range" min="0" max="1" step="0.05" value="0.55" />
+        <input id="opacityNumber" type="number" min="0" max="1" step="0.05" value="0.55" />
+      </div>
+      <div class="hint">Opacity gælder for alle cirkler og gemmes automatisk.</div>
+
       <button id="add" class="primary">Tilføj</button>
 
       <div id="status" class="status"></div>
@@ -146,14 +176,26 @@
 
           <details open>
             <summary>
-              Kredse / kategorier
+              Kredse
               <span class="summaryRight" id="kredsSummary"></span>
             </summary>
             <div class="filterBtns">
-              <button class="mini" id="kredsAll">Vælg alle</button>
-              <button class="mini" id="kredsNone">Fjern alle</button>
+              <button class="mini" id="kredsAll" type="button">Vælg alle</button>
+              <button class="mini" id="kredsNone" type="button">Fjern alle</button>
             </div>
             <div class="filterGrid" id="kredsFilters"></div>
+          </details>
+
+          <details open>
+            <summary>
+              Farver
+              <span class="summaryRight" id="colorSummary"></span>
+            </summary>
+            <div class="filterBtns">
+              <button class="mini" id="colorAll" type="button">Vælg alle</button>
+              <button class="mini" id="colorNone" type="button">Fjern alle</button>
+            </div>
+            <div class="filterGrid" id="colorFilters"></div>
           </details>
         </details>
       </div>
@@ -172,37 +214,38 @@
         <details>
           <summary>
             Ændringer for alle valgsteder
-            <span class="summaryRight"></span>
+            <span class="summaryRight" id="bulkSummary"></span>
           </summary>
 
-          <div class="row2" style="margin-top:10px;">
+          <div class="bulkBox" style="margin-top:10px;">
             <div>
-              <label for="bulkRadiusNumber">Sæt størrelse for alle (px) (max 20)</label>
-              <input id="bulkRadiusNumber" type="number" min="2" max="20" value="12" />
-              <button id="applyBulkRadius" class="mini primary" style="margin-top:8px;">Anvend størrelse til alle</button>
+              <label for="bulkTargetColor">Gælder for (farve)</label>
+              <select id="bulkTargetColor"></select>
+              <div class="hint" id="bulkTargetHint"></div>
             </div>
 
-            <div>
-              <label for="bulkColor">Sæt farve for alle</label>
-              <select id="bulkColor"></select>
-              <button id="applyBulkColor" class="mini" style="margin-top:8px;">Anvend farve til alle</button>
+            <div class="row2">
+              <div>
+                <label for="bulkRadiusNumber">Sæt størrelse (px) (max 20)</label>
+                <input id="bulkRadiusNumber" type="number" min="2" max="20" value="12" />
+                <button id="applyBulkRadius" class="mini primary" type="button" style="margin-top:8px;">Anvend størrelse</button>
+              </div>
+
+              <div>
+                <label for="bulkColor">Skift farve til</label>
+                <select id="bulkColor"></select>
+                <button id="applyBulkColor" class="mini" type="button" style="margin-top:8px;">Anvend farveskift</button>
+              </div>
             </div>
-          </div>
 
-          <label for="bulkOpacityNumber" style="margin-top:12px;">Opacity for alle cirkler (0–1)</label>
-          <div class="controlsRow">
-            <input id="bulkOpacityRange" type="range" min="0" max="1" step="0.05" value="0.55" />
-            <input id="bulkOpacityNumber" type="number" min="0" max="1" step="0.05" value="0.55" />
+            <button id="clearAllStorage" class="mini" type="button" style="margin-top:6px;">Slet alle gemte valgsteder</button>
+            <div class="hint">Dette fjerner alt gemt i browseren (localStorage).</div>
           </div>
-          <div class="hint">Opacity gemmes automatisk.</div>
-
-          <button id="clearAllStorage" class="mini" style="margin-top:12px;">Slet alle gemte valgsteder</button>
-          <div class="hint">Dette fjerner alt gemt i browseren (localStorage).</div>
         </details>
       </div>
-
     </div>
 
+    <div id="resizer" class="resizer" title="Træk for at ændre menu-bredde"></div>
     <div id="map"></div>
   </div>
 
@@ -211,23 +254,13 @@
   <script>
     // ----------------- Konfiguration -----------------
     const PER_REQUEST_DELAY_MS = 80;
-    const LIMIT_TO_CPH = true; // geokodning begrænses i baggrunden til kommunekode 0101
+    const LIMIT_TO_CPH = true;
     const STORAGE_KEY = "valgsteder_state_v4";
+    const UI_KEY = "valgsteder_ui_v1";
 
     // Overlay styling:
-    // - ring 1 + ring 2 kommuner: mørkegrå udfyldning
-    // - København: rød outline, ingen fill
-    const NEIGHBOR_STYLE = {
-      color: "#2f2f2f",
-      weight: 1,
-      fillColor: "#2f2f2f",
-      fillOpacity: 0.35
-    };
-    const CPH_OUTLINE_STYLE = {
-      color: "#e11d48",
-      weight: 3,
-      fillOpacity: 0
-    };
+    const NEIGHBOR_STYLE = { color: "#2f2f2f", weight: 1, fillColor: "#2f2f2f", fillOpacity: 0.35 };
+    const CPH_OUTLINE_STYLE = { color: "#e11d48", weight: 3, fillOpacity: 0 };
 
     const COLOR_PRESETS = [
       { label: "Rød",   value: "#e11d48" },
@@ -240,14 +273,6 @@
     ];
     const COLOR_LABEL_BY_VALUE = Object.fromEntries(COLOR_PRESETS.map(c => [c.value, c.label]));
 
-    // Kreds/kategorier: værdier (keys) + labels
-    const KREDS_OPTIONS = [
-      ...Array.from({ length: 9 }, (_, i) => ({ key: String(i + 1), label: `${i + 1}. kreds` })),
-      { key: "new",    label: "Nyt valgsted" },
-      { key: "closed", label: "Nedlagt valgsted" }
-    ];
-    const KREDS_LABEL_BY_KEY = Object.fromEntries(KREDS_OPTIONS.map(o => [o.key, o.label]));
-
     // ----------------- Kort -----------------
     const map = L.map('map').setView([55.6761, 12.5683], 12);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -255,33 +280,27 @@
       attribution: '&copy; OpenStreetMap'
     }).addTo(map);
 
-    // Pane til ring 1+2 (over tiles, under markører)
     map.createPane('neighborsPane');
     map.getPane('neighborsPane').style.zIndex = 430;
     map.getPane('neighborsPane').style.pointerEvents = 'none';
 
-    // Pane til København outline (over naboer, under markører)
     map.createPane('cphOutlinePane');
     map.getPane('cphOutlinePane').style.zIndex = 440;
     map.getPane('cphOutlinePane').style.pointerEvents = 'none';
 
-    // Markører øverst
     const markerGroup = L.layerGroup().addTo(map);
 
     // ----------------- State -----------------
-    // entry: {id, kredsKey, name, address, color, radius, lat, lng}
-    const entries = [];
-
-    // Filtre: kun kredse/kategorier
-    const selectedKredse = new Set(KREDS_OPTIONS.map(o => o.key));
-
+    const entries = []; // {id,kreds,name,address,color,radius,lat,lng}
+    const selectedKredse = new Set([1,2,3,4,5,6,7,8,9]);
+    const selectedColors = new Set(COLOR_PRESETS.map(c => c.value));
     let currentOpacity = 0.55;
 
     const markerById = new Map();
     const editingIds = new Set();
     const backups = new Map();
 
-    // ----------------- Helpers -----------------
+    // ----------------- UI helpers -----------------
     const statusEl = document.getElementById('status');
     function setStatus(msg) { statusEl.textContent = msg || ''; }
 
@@ -304,7 +323,7 @@
     function clampOpacity(v) {
       const n = Number(v);
       if (!Number.isFinite(n)) return currentOpacity;
-      return Math.max(0, Math.min(1, Math.round(n * 20) / 20)); // 0.05 step
+      return Math.max(0, Math.min(1, Math.round(n * 20) / 20)); // 0.05
     }
 
     function populateColorSelect(selectEl, defaultValue) {
@@ -318,29 +337,23 @@
       selectEl.value = defaultValue || COLOR_PRESETS[0].value;
     }
 
-    function populateKredsSelect(selectEl, defaultKey) {
+    function populateKredsSelect(selectEl) {
       selectEl.innerHTML = '';
       const opt0 = document.createElement('option');
       opt0.value = '';
-      opt0.textContent = 'Vælg…';
+      opt0.textContent = 'Vælg kreds…';
       selectEl.appendChild(opt0);
-
-      for (const o of KREDS_OPTIONS) {
+      for (let i=1;i<=9;i++) {
         const opt = document.createElement('option');
-        opt.value = o.key;
-        opt.textContent = o.label;
+        opt.value = String(i);
+        opt.textContent = String(i);
         selectEl.appendChild(opt);
       }
-
-      selectEl.value = defaultKey ?? '';
-    }
-
-    function labelForKredsKey(k) {
-      return KREDS_LABEL_BY_KEY[k] || String(k);
+      selectEl.value = '';
     }
 
     function isEntryVisible(e) {
-      return selectedKredse.has(e.kredsKey);
+      return selectedKredse.has(e.kreds) && selectedColors.has(e.color);
     }
 
     function markerPopupHtml(e) {
@@ -348,7 +361,7 @@
       return `
         <div style="line-height:1.3">
           <b>${escapeHtml(e.name || '(uden navn)')}</b><br/>
-          ${escapeHtml(labelForKredsKey(e.kredsKey))}<br/>
+          Kreds: ${escapeHtml(e.kreds)}<br/>
           ${escapeHtml(e.address)}<br/>
           <span style="color:#666">${escapeHtml(colorLabel)}, ${escapeHtml(e.radius)}px</span>
         </div>
@@ -373,12 +386,7 @@
     function updateMarkerStyleAndPopup(e) {
       const m = markerById.get(e.id);
       if (!m) return;
-      m.setStyle({
-        color: e.color,
-        fillColor: e.color,
-        fillOpacity: currentOpacity,
-        weight: 1
-      });
+      m.setStyle({ color: e.color, fillColor: e.color, fillOpacity: currentOpacity, weight: 1 });
       m.setRadius(e.radius);
       m.bindPopup(markerPopupHtml(e));
     }
@@ -405,111 +413,53 @@
       updateVisibility();
     }
 
-    // ----------------- Kommuner overlay (ring 1 + ring 2) -----------------
+    // ----------------- Kommuner overlay -----------------
     function collectRoundedCoordKeys(geometry, decimals = 6) {
       const out = [];
       const round = (x) => Number(x).toFixed(decimals);
-
       function pushPoint(pt) {
         if (!pt || pt.length < 2) return;
         out.push(`${round(pt[0])},${round(pt[1])}`);
       }
-
       if (!geometry) return out;
 
       if (geometry.type === "Polygon") {
-        for (const ring of geometry.coordinates || []) {
-          for (const pt of ring || []) pushPoint(pt);
-        }
+        for (const ring of geometry.coordinates || []) for (const pt of ring || []) pushPoint(pt);
       } else if (geometry.type === "MultiPolygon") {
         for (const poly of geometry.coordinates || []) {
-          for (const ring of poly || []) {
-            for (const pt of ring || []) pushPoint(pt);
-          }
+          for (const ring of poly || []) for (const pt of ring || []) pushPoint(pt);
         }
       }
       return out;
     }
 
-    async function addCphRing2Overlay() {
+    async function addCphAndNeighborsOverlay() {
       try {
         const url = "https://api.dataforsyningen.dk/kommuner/?format=geojson";
         const res = await fetch(url, { headers: { "Accept": "application/json" } });
         if (!res.ok) throw new Error("HTTP " + res.status);
         const geo = await res.json();
-        const feats = geo.features || [];
 
-        const getCode = (f) => String((f.properties || {}).kode || "");
-        const cph = feats.find(f => getCode(f) === "0101") || feats.find(f => /københavn/i.test(String((f.properties||{}).navn||"")));
+        const feats = geo.features || [];
+        const cph = feats.find(f => String((f.properties || {}).kode || "") === "0101")
+                || feats.find(f => /københavn/i.test(String((f.properties || {}).navn || "")));
         if (!cph) return;
 
-        // Byg index: coordKey -> set af kommunekoder der har det punkt
-        const keyToCodes = new Map();
-        const codeToFeature = new Map();
+        const cphKeys = new Set(collectRoundedCoordKeys(cph.geometry, 6));
 
+        const neighbors = [];
         for (const f of feats) {
-          const code = getCode(f);
-          if (!code) continue;
-          codeToFeature.set(code, f);
-
+          const code = String((f.properties || {}).kode || "");
+          if (code === "0101") continue;
+          if (code === "0147") { neighbors.push(f); continue; } // Frederiksberg
           const keys = collectRoundedCoordKeys(f.geometry, 6);
-          for (const k of keys) {
-            let s = keyToCodes.get(k);
-            if (!s) { s = new Set(); keyToCodes.set(k, s); }
-            s.add(code);
-          }
+          let isNeighbor = false;
+          for (const k of keys) { if (cphKeys.has(k)) { isNeighbor = true; break; } }
+          if (isNeighbor) neighbors.push(f);
         }
 
-        // Adjacency: kommune -> set af naboer (deler mindst én key)
-        const adjacency = new Map();
-        for (const [k, codesSet] of keyToCodes.entries()) {
-          const codes = Array.from(codesSet);
-          if (codes.length < 2) continue;
-          for (let i=0;i<codes.length;i++) {
-            for (let j=i+1;j<codes.length;j++) {
-              const a = codes[i], b = codes[j];
-              if (!adjacency.has(a)) adjacency.set(a, new Set());
-              if (!adjacency.has(b)) adjacency.set(b, new Set());
-              adjacency.get(a).add(b);
-              adjacency.get(b).add(a);
-            }
-          }
-        }
-
-        // BFS fra København til dybde 2
-        const start = "0101";
-        const depth = new Map([[start, 0]]);
-        const q = [start];
-
-        while (q.length) {
-          const cur = q.shift();
-          const d = depth.get(cur);
-          if (d >= 2) continue;
-          const neigh = adjacency.get(cur) || new Set();
-          for (const n of neigh) {
-            if (!depth.has(n)) {
-              depth.set(n, d + 1);
-              q.push(n);
-            }
-          }
-        }
-
-        // Vi vil farve alle med depth 1 eller 2, plus Frederiksberg (0147), men ikke København selv.
-        const grayCodes = new Set();
-        for (const [code, d] of depth.entries()) {
-          if (code === start) continue;
-          if (d === 1 || d === 2) grayCodes.add(code);
-        }
-        grayCodes.add("0147"); // Frederiksberg med uanset hvad
-
-        const grayFeatures = [];
-        for (const code of grayCodes) {
-          const f = codeToFeature.get(code);
-          if (f) grayFeatures.push(f);
-        }
-
-        if (grayFeatures.length) {
-          L.geoJSON({ type: "FeatureCollection", features: grayFeatures }, {
+        if (neighbors.length) {
+          L.geoJSON({ type: "FeatureCollection", features: neighbors }, {
             pane: "neighborsPane",
             style: () => NEIGHBOR_STYLE
           }).addTo(map);
@@ -519,8 +469,8 @@
           pane: "cphOutlinePane",
           style: () => CPH_OUTLINE_STYLE
         }).addTo(map);
-        cphOutline.bringToFront();
 
+        cphOutline.bringToFront();
       } catch (e) {
         console.warn("Kunne ikke indlæse kommune-overlays:", e);
       }
@@ -532,15 +482,10 @@
         version: 4,
         opacity: currentOpacity,
         selectedKredse: [...selectedKredse],
+        selectedColors: [...selectedColors],
         entries: entries.map(e => ({
-          id: e.id,
-          kredsKey: e.kredsKey,
-          name: e.name,
-          address: e.address,
-          color: e.color,
-          radius: e.radius,
-          lat: e.lat,
-          lng: e.lng
+          id: e.id, kreds: e.kreds, name: e.name, address: e.address,
+          color: e.color, radius: e.radius, lat: e.lat, lng: e.lng
         }))
       };
       try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch {}
@@ -556,15 +501,16 @@
         currentOpacity = clampOpacity(s.opacity ?? 0.55);
 
         selectedKredse.clear();
-        const defaults = KREDS_OPTIONS.map(o => o.key);
-        for (const k of (s.selectedKredse ?? defaults)) selectedKredse.add(String(k));
+        for (const k of (s.selectedKredse ?? [1,2,3,4,5,6,7,8,9])) selectedKredse.add(Number(k));
+
+        selectedColors.clear();
+        for (const c of (s.selectedColors ?? COLOR_PRESETS.map(x => x.value))) selectedColors.add(c);
 
         entries.splice(0, entries.length);
         for (const e of s.entries) {
-          const kredsKey = String(e.kredsKey ?? "");
           entries.push({
             id: e.id || uuid(),
-            kredsKey: KREDS_LABEL_BY_KEY[kredsKey] ? kredsKey : "1",
+            kreds: Number(e.kreds) || 1,
             name: e.name || "",
             address: e.address || "",
             color: e.color || COLOR_PRESETS[0].value,
@@ -628,72 +574,134 @@
       return { ok:true };
     }
 
-    // ----------------- Filters UI (kun kredse/kategorier) -----------------
+    // ----------------- Filters UI -----------------
     function renderKredsFilters() {
       const container = document.getElementById('kredsFilters');
       container.innerHTML = '';
-
-      for (const o of KREDS_OPTIONS) {
-        const id = `k_${o.key}`;
+      for (let k=1;k<=9;k++) {
+        const id = `kreds_${k}`;
         const lab = document.createElement('label');
         lab.className = 'filterItem';
         lab.innerHTML = `
-          <input type="checkbox" id="${id}" ${selectedKredse.has(o.key) ? 'checked' : ''}/>
-          <span>${escapeHtml(o.label)}</span>
+          <input type="checkbox" id="${id}" ${selectedKredse.has(k) ? 'checked' : ''}/>
+          <span>${k}</span>
         `;
         container.appendChild(lab);
-
         lab.querySelector('input').addEventListener('change', (ev) => {
-          if (ev.target.checked) selectedKredse.add(o.key);
-          else selectedKredse.delete(o.key);
+          if (ev.target.checked) selectedKredse.add(k);
+          else selectedKredse.delete(k);
           updateVisibility();
           saveState();
           renderKredsSummaries();
-          renderKredsLists();
         });
       }
       renderKredsSummaries();
     }
 
+    function renderColorFilters() {
+      const container = document.getElementById('colorFilters');
+      container.innerHTML = '';
+      for (const c of COLOR_PRESETS) {
+        const id = `color_${btoa(c.value).replace(/=/g,'')}`;
+        const lab = document.createElement('label');
+        lab.className = 'filterItem';
+        lab.innerHTML = `
+          <input type="checkbox" id="${id}" ${selectedColors.has(c.value) ? 'checked' : ''}/>
+          <span class="swatch" style="background:${c.value}"></span>
+          <span>${c.label}</span>
+        `;
+        container.appendChild(lab);
+        lab.querySelector('input').addEventListener('change', (ev) => {
+          if (ev.target.checked) selectedColors.add(c.value);
+          else selectedColors.delete(c.value);
+          updateVisibility();
+          saveState();
+          renderColorSummaries();
+        });
+      }
+      renderColorSummaries();
+    }
+
     function setAllKredse(on) {
       selectedKredse.clear();
-      if (on) for (const o of KREDS_OPTIONS) selectedKredse.add(o.key);
+      if (on) for (let k=1;k<=9;k++) selectedKredse.add(k);
       renderKredsFilters();
       updateVisibility();
       saveState();
-      renderKredsLists();
+    }
+
+    function setAllColors(on) {
+      selectedColors.clear();
+      if (on) for (const c of COLOR_PRESETS) selectedColors.add(c.value);
+      renderColorFilters();
+      updateVisibility();
+      saveState();
     }
 
     function renderKredsSummaries() {
-      document.getElementById('kredsSummary').textContent = `${selectedKredse.size}/${KREDS_OPTIONS.length} valgt`;
+      document.getElementById('kredsSummary').textContent = `${selectedKredse.size}/9 valgt`;
     }
-
+    function renderColorSummaries() {
+      document.getElementById('colorSummary').textContent = `${selectedColors.size}/${COLOR_PRESETS.length} valgt`;
+    }
     function updateSummaries() {
       const visible = entries.filter(isEntryVisible).length;
       document.getElementById('filterSummary').textContent = `${visible}/${entries.length} vises`;
       document.getElementById('listSummary').textContent = `${entries.length} total`;
       renderKredsSummaries();
+      renderColorSummaries();
+      updateBulkSummary();
     }
 
-    // ----------------- Liste pr. kreds/kategori -----------------
-    function groupEntriesByKredsKey() {
-      const byK = new Map();
-      for (const o of KREDS_OPTIONS) byK.set(o.key, []);
-      for (const e of entries) {
-        const k = byK.has(e.kredsKey) ? e.kredsKey : "1";
-        byK.get(k).push(e);
+    // ----------------- Bulk segmentation (by color) -----------------
+    function populateBulkTargetColor() {
+      const sel = document.getElementById('bulkTargetColor');
+      sel.innerHTML = '';
+
+      const all = document.createElement('option');
+      all.value = "__all__";
+      all.textContent = "Alle farver";
+      sel.appendChild(all);
+
+      for (const c of COLOR_PRESETS) {
+        const opt = document.createElement('option');
+        opt.value = c.value;          // target existing color
+        opt.textContent = c.label;    // "Rød", "Blå", ...
+        sel.appendChild(opt);
       }
-      return byK;
+      sel.value = "__all__";
+      updateBulkSummary();
     }
 
+    function getBulkTargets() {
+      const target = document.getElementById('bulkTargetColor').value;
+      if (target === "__all__") return entries.slice();
+      return entries.filter(e => e.color === target);
+    }
+
+    function updateBulkSummary() {
+      const t = getBulkTargets().length;
+      const total = entries.length;
+      document.getElementById('bulkSummary').textContent = (total ? `${t}/${total}` : '');
+      const hint = document.getElementById('bulkTargetHint');
+      const target = document.getElementById('bulkTargetColor').value;
+      hint.textContent =
+        target === "__all__"
+          ? "Ændringerne påvirker alle valgsteder."
+          : `Ændringerne påvirker kun valgsteder med farven "${COLOR_LABEL_BY_VALUE[target] || target}".`;
+    }
+
+    // ----------------- Liste pr. kreds -----------------
     function renderKredsLists() {
       const container = document.getElementById('kredsLists');
       container.innerHTML = '';
 
-      const byK = groupEntriesByKredsKey();
+      const byK = new Map();
+      for (let k=1;k<=9;k++) byK.set(k, []);
+      for (const e of entries) byK.get(e.kreds)?.push(e);
 
-      for (const o of KREDS_OPTIONS) {
-        const list = byK.get(o.key) || [];
+      for (let k=1;k<=9;k++) {
+        const list = byK.get(k) || [];
         const det = document.createElement('details');
         det.open = list.length > 0;
         det.style.marginTop = "10px";
@@ -701,7 +709,7 @@
         const visCount = list.filter(isEntryVisible).length;
         det.innerHTML = `
           <summary>
-            ${escapeHtml(o.label)}
+            Kreds ${k}
             <span class="summaryRight">${list.length} (viser ${visCount})</span>
           </summary>
           <div style="margin-top:10px;">
@@ -709,13 +717,13 @@
               <table>
                 <thead>
                   <tr>
-                    <th style="width: 26%;">Navn</th>
-                    <th>Adresse</th>
-                    <th style="width: 18%;">Stil</th>
-                    <th style="width: 18%;">Handling</th>
+                    <th style="width: 28%;">Navn</th>
+                    <th style="width: 36%;">Adresse</th>
+                    <th style="width: 16%;">Stil</th>
+                    <th style="width: 20%;">Handling</th>
                   </tr>
                 </thead>
-                <tbody id="tbody_k_${o.key}"></tbody>
+                <tbody id="tbody_k${k}"></tbody>
               </table>
             `}
           </div>
@@ -723,9 +731,8 @@
         container.appendChild(det);
 
         if (list.length) {
-          const tbody = det.querySelector(`#tbody_k_${CSS.escape(o.key)}`);
+          const tbody = det.querySelector(`#tbody_k${k}`);
           tbody.innerHTML = "";
-
           for (const e of list) {
             const tr = document.createElement('tr');
             const isEditing = editingIds.has(e.id);
@@ -744,8 +751,8 @@
                 <td>${styleHtml}</td>
                 <td>
                   <div class="actions">
-                    <button class="mini" data-edit="${e.id}">Redigér</button>
-                    <button class="mini" data-del="${e.id}">Slet</button>
+                    <button class="mini" data-edit="${e.id}" type="button">Redigér</button>
+                    <button class="mini" data-del="${e.id}" type="button">Slet</button>
                   </div>
                 </td>
               `;
@@ -768,8 +775,8 @@
                 </td>
                 <td>
                   <div class="actions">
-                    <button class="mini primary" data-save="${e.id}">Gem</button>
-                    <button class="mini" data-cancel="${e.id}">Fortryd</button>
+                    <button class="mini primary" data-save="${e.id}" type="button">Gem</button>
+                    <button class="mini" data-cancel="${e.id}" type="button">Fortryd</button>
                   </div>
                 </td>
               `;
@@ -781,14 +788,14 @@
             if (isEditing) {
               const kredsSel = tr.querySelector(`select[data-editkreds="${CSS.escape(e.id)}"]`);
               const colorSel = tr.querySelector(`select[data-editcolor="${CSS.escape(e.id)}"]`);
-              if (kredsSel) populateKredsSelect(kredsSel, e.kredsKey);
-              if (colorSel) populateColorSelect(colorSel, e.color);
+              if (kredsSel) { populateKredsSelect(kredsSel); kredsSel.value = String(e.kreds); }
+              if (colorSel) { populateColorSelect(colorSel, e.color); }
             }
           }
         }
       }
 
-      // bind actions
+      // bind row actions
       container.querySelectorAll('button[data-del]').forEach(btn => {
         btn.addEventListener('click', () => {
           const id = btn.getAttribute('data-del');
@@ -833,7 +840,7 @@
           const e = entries.find(x => x.id === id);
           const b = backups.get(id);
           if (e && b) {
-            e.kredsKey = b.kredsKey;
+            e.kreds = b.kreds;
             e.name = b.name;
             e.address = b.address;
             e.color = b.color;
@@ -865,18 +872,18 @@
           const colorSel = container.querySelector(`select[data-editcolor="${CSS.escape(id)}"]`);
           const radInp   = container.querySelector(`input[data-editradius="${CSS.escape(id)}"]`);
 
-          const newKredsKey = String(kredsSel?.value || "");
+          const newKreds = Number(kredsSel?.value || 0);
           const newName  = (nameInp?.value ?? "").trim();
           const newAddr  = (addrInp?.value ?? "").trim();
           const newColor = (colorSel?.value ?? e.color);
           const newRad   = clampRadius(radInp?.value ?? e.radius);
 
-          if (!newKredsKey || !KREDS_LABEL_BY_KEY[newKredsKey]) { setStatus('Vælg en kreds/kategori.'); return; }
+          if (!newKreds || newKreds < 1 || newKreds > 9) { setStatus('Vælg en kreds (1–9).'); return; }
           if (!newAddr) { setStatus('Adresse må ikke være tom.'); return; }
 
           const oldAddr = e.address;
 
-          e.kredsKey = newKredsKey;
+          e.kreds = newKreds;
           e.name = newName;
           e.address = newAddr;
           e.color = newColor;
@@ -898,7 +905,7 @@
             renderKredsLists();
             setStatus('');
           } catch (err) {
-            e.kredsKey = b.kredsKey;
+            e.kreds = b.kreds;
             e.name = b.name;
             e.address = b.address;
             e.color = b.color;
@@ -927,14 +934,15 @@
       const btn = document.getElementById('add');
       btn.disabled = true;
 
-      const kredsKey = String(document.getElementById('kreds').value || "");
+      const kredsVal = document.getElementById('kreds').value;
+      const kreds = Number(kredsVal);
       const name = document.getElementById('name').value.trim();
       const address = document.getElementById('address').value.trim();
       const color = document.getElementById('color').value;
       const radius = clampRadius(document.getElementById('radiusNumber').value);
 
-      if (!kredsKey || !KREDS_LABEL_BY_KEY[kredsKey]) {
-        setStatus('Vælg en kreds/kategori før du tilføjer.');
+      if (!kreds || kreds < 1 || kreds > 9) {
+        setStatus('Vælg en kreds (1–9) før du tilføjer.');
         btn.disabled = false;
         return;
       }
@@ -944,7 +952,7 @@
         return;
       }
 
-      const e = { id: uuid(), kredsKey, name, address, color, radius, lat: undefined, lng: undefined };
+      const e = { id: uuid(), kreds, name, address, color, radius, lat: undefined, lng: undefined };
       entries.push(e);
       renderKredsLists();
       setStatus('');
@@ -977,12 +985,13 @@
       }
     }
 
-    // ----------------- Bulk handlers -----------------
+    // ----------------- Bulk handlers (segmented by color) -----------------
     function applyBulkRadius() {
+      const targets = getBulkTargets();
       const r = clampRadius(document.getElementById('bulkRadiusNumber').value);
-      if (entries.length === 0) { setStatus('Der er ingen punkter at opdatere.'); return; }
+      if (targets.length === 0) { setStatus('Ingen valgsteder matcher den valgte målgruppe.'); return; }
 
-      for (const e of entries) {
+      for (const e of targets) {
         e.radius = r;
         ensureMarker(e);
         updateMarkerStyleAndPopup(e);
@@ -994,11 +1003,12 @@
     }
 
     function applyBulkColor() {
-      const c = document.getElementById('bulkColor').value;
-      if (entries.length === 0) { setStatus('Der er ingen punkter at opdatere.'); return; }
+      const targets = getBulkTargets();
+      const newColor = document.getElementById('bulkColor').value;
+      if (targets.length === 0) { setStatus('Ingen valgsteder matcher den valgte målgruppe.'); return; }
 
-      for (const e of entries) {
-        e.color = c;
+      for (const e of targets) {
+        e.color = newColor;
         ensureMarker(e);
         updateMarkerStyleAndPopup(e);
       }
@@ -1008,28 +1018,82 @@
       setStatus('');
     }
 
-    // Opacity (for alle) i "Ændringer for alle valgsteder"
-    const bulkOpacityRange = document.getElementById('bulkOpacityRange');
-    const bulkOpacityNumber = document.getElementById('bulkOpacityNumber');
+    // ----------------- Opacity sync -----------------
+    const opacityRange = document.getElementById('opacityRange');
+    const opacityNumber = document.getElementById('opacityNumber');
 
-    function syncBulkOpacityFrom(source) {
+    function syncOpacityFrom(source) {
       currentOpacity = clampOpacity(source.value);
-      bulkOpacityRange.value = String(currentOpacity);
-      bulkOpacityNumber.value = String(currentOpacity);
+      opacityRange.value = String(currentOpacity);
+      opacityNumber.value = String(currentOpacity);
       updateAllMarkersOpacity();
       saveState();
       setStatus('');
+    }
+
+    // ----------------- Sidebar resizer (persisted) -----------------
+    function loadUI() {
+      try {
+        const raw = localStorage.getItem(UI_KEY);
+        if (!raw) return;
+        const s = JSON.parse(raw);
+        const w = Number(s.sidebarWidth);
+        if (Number.isFinite(w)) setSidebarWidth(w);
+      } catch {}
+    }
+    function saveUI(width) {
+      try { localStorage.setItem(UI_KEY, JSON.stringify({ sidebarWidth: width })); } catch {}
+    }
+    function setSidebarWidth(px) {
+      const w = Math.max(280, Math.min(720, Math.round(px)));
+      document.documentElement.style.setProperty('--sidebar', w + 'px');
+      map.invalidateSize();
+      saveUI(w);
+    }
+
+    function initResizer() {
+      const handle = document.getElementById('resizer');
+      let dragging = false;
+      let startX = 0;
+      let startW = 0;
+
+      const onMove = (e) => {
+        if (!dragging) return;
+        const dx = (e.clientX - startX);
+        setSidebarWidth(startW + dx);
+      };
+      const onUp = () => {
+        dragging = false;
+        document.body.style.userSelect = '';
+        window.removeEventListener('mousemove', onMove);
+        window.removeEventListener('mouseup', onUp);
+      };
+
+      handle.addEventListener('mousedown', (e) => {
+        dragging = true;
+        startX = e.clientX;
+        const cs = getComputedStyle(document.documentElement);
+        startW = parseInt(cs.getPropertyValue('--sidebar'), 10) || 420;
+        document.body.style.userSelect = 'none';
+        window.addEventListener('mousemove', onMove);
+        window.addEventListener('mouseup', onUp);
+      });
+
+      // Double click resets
+      handle.addEventListener('dblclick', () => setSidebarWidth(420));
     }
 
     // ----------------- Init -----------------
     populateKredsSelect(document.getElementById('kreds'));
     populateColorSelect(document.getElementById('color'), COLOR_PRESETS[0].value);
     populateColorSelect(document.getElementById('bulkColor'), COLOR_PRESETS[0].value);
+    populateBulkTargetColor();
 
+    loadUI();
     loadState();
 
-    bulkOpacityRange.value = String(currentOpacity);
-    bulkOpacityNumber.value = String(currentOpacity);
+    opacityRange.value = String(currentOpacity);
+    opacityNumber.value = String(currentOpacity);
 
     for (const e of entries) {
       ensureMarker(e);
@@ -1037,12 +1101,13 @@
     }
 
     renderKredsFilters();
+    renderColorFilters();
     renderKredsLists();
     updateVisibility();
     updateSummaries();
 
-    // Kommuner overlay: ring 1 + ring 2 grå + København rød outline
-    addCphRing2Overlay();
+    addCphAndNeighborsOverlay();
+    initResizer();
 
     // bind
     document.getElementById('add').addEventListener('click', addEntry);
@@ -1051,15 +1116,21 @@
 
     document.getElementById('kredsAll').addEventListener('click', () => setAllKredse(true));
     document.getElementById('kredsNone').addEventListener('click', () => setAllKredse(false));
+    document.getElementById('colorAll').addEventListener('click', () => setAllColors(true));
+    document.getElementById('colorNone').addEventListener('click', () => setAllColors(false));
 
-    bulkOpacityRange.addEventListener('input', () => syncBulkOpacityFrom(bulkOpacityRange));
-    bulkOpacityNumber.addEventListener('input', () => syncBulkOpacityFrom(bulkOpacityNumber));
+    opacityRange.addEventListener('input', () => syncOpacityFrom(opacityRange));
+    opacityNumber.addEventListener('input', () => syncOpacityFrom(opacityNumber));
 
     document.getElementById('address').addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
         e.preventDefault();
         document.getElementById('add').click();
       }
+    });
+
+    document.getElementById('bulkTargetColor').addEventListener('change', () => {
+      updateBulkSummary();
     });
 
     document.getElementById('clearAllStorage').addEventListener('click', () => {
@@ -1075,10 +1146,11 @@
       editingIds.clear();
       backups.clear();
 
-      selectedKredse.clear();
-      for (const o of KREDS_OPTIONS) selectedKredse.add(o.key);
+      selectedKredse.clear(); for (let k=1;k<=9;k++) selectedKredse.add(k);
+      selectedColors.clear(); for (const c of COLOR_PRESETS) selectedColors.add(c.value);
 
       renderKredsFilters();
+      renderColorFilters();
       renderKredsLists();
       updateVisibility();
       setStatus('');
