@@ -242,7 +242,7 @@
     const SEED_KEY = "valgsteder_seed_v1";
 
     const NEIGHBOR_STYLE = { color: "#2f2f2f", weight: 1, fillColor: "#2f2f2f", fillOpacity: 0.35 };
-    const CPH_OUTLINE_STYLE = { color: "#e11d48", weight: 3, fillOpacity: 0 };
+    const CPH_OUTLINE_STYLE = { color: "#e11d48", weight: 1, fillOpacity: 0 };
 
     const COLOR_PRESETS = [
       { label: "Rød",   value: "#e11d48" },
@@ -458,18 +458,14 @@ const DEFAULT_VALGSTEDER = [
       return selectedKredse.has(e.kredsKey);
     }
 
-    function markerPopupHtml(e) {
-      const colorLabel = COLOR_LABEL_BY_VALUE[e.color] || '';
-      const op = (typeof e.opacity === "number") ? e.opacity : defaultOpacity;
-      return `
-        <div style="line-height:1.3">
-          <b>${escapeHtml(e.name || '(uden navn)')}</b><br/>
-          ${escapeHtml(labelForKredsKey(e.kredsKey))}<br/>
-          ${escapeHtml(e.address)}<br/>
-          <span style="color:#666">${escapeHtml(colorLabel)}, ${escapeHtml(e.radius)}px, opacitet ${escapeHtml(op)}</span>
-        </div>
-      `;
-    }
+function markerPopupHtml(e) {
+  return `
+    <div style="line-height:1.3">
+      <b>${escapeHtml(e.name || '(uden navn)')}</b><br/>
+      ${escapeHtml(e.address || '')}
+    </div>
+  `;
+}
 
     function ensureMarker(e) {
       let m = markerById.get(e.id);
